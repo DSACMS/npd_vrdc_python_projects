@@ -118,7 +118,7 @@ class TINProcessor:
         return display_sql
     
     @staticmethod
-    def execute_tin_processing():
+    def execute_tin_processing(*, is_just_print ):
         """
         Main execution method that orchestrates the entire TIN processing workflow.
         """
@@ -163,9 +163,13 @@ class TINProcessor:
         }
         
         for description, sql in sql_dict.items():
-            print(f"\n{description}:\nRunning:\n")
+            print(f"\n{description}:\n")
             print(sql)
-            spark.sql(sql)  # type: ignore
+            if(is_just_print):
+                print("Just printing for now\n")
+            else:
+                print("Running:\n")
+                spark.sql(sql)  # type: ignore
         
         # Step 5: Display results using Databricks display function
         display_sql = TINProcessor._display_results(
@@ -182,4 +186,5 @@ class TINProcessor:
 
 # Execute the TIN processing workflow
 if __name__ == "__main__":
-    TINProcessor.execute_tin_processing()
+    is_just_print = True
+    TINProcessor.execute_tin_processing(is_just_print=is_just_print)
