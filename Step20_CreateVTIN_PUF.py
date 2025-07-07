@@ -3,8 +3,8 @@
 # Load all TINs from PUF_TIN_LIST into a DataFrame, process VTINs in-memory, and create a new table PUF_VTIN_LIST
 # spark.sql is already in scope, no need to import it.
 
-from pyspark.sql import functions as F
-from pyspark.sql.types import StringType
+from pyspark.sql import functions as F # type: ignore
+from pyspark.sql.types import StringType # type: ignore
 
 rif_catalog = 'extracts'
 rif_database = 'rif2025'
