@@ -1,9 +1,10 @@
 #--Step20_CreateVTIN_PUF.py----------------------------
 # presume that the VEIN class from VEIN.py  in scope and assume that MAIN_KEY and MAIN_MODULUS are also defined and in the scope of this databricks notebook
-# Loop over every row of data in the results from Step10 in PUF_TIN_LIST
-# replace the vtin column in each row of data with a proper value from VEIN.VTIN_identifier
-# perform the UPDATE SQL operations on 100 rows at a time for efficiency
+# Load all TINs from PUF_TIN_LIST into a DataFrame, process VTINs in-memory, and create a new table PUF_VTIN_LIST
 # spark.sql is already in scope, no need to import it.
+
+from pyspark.sql import functions as F
+from pyspark.sql.types import StringType
 
 rif_catalog = 'extracts'
 rif_database = 'rif2025'
@@ -11,20 +12,46 @@ rif_database = 'rif2025'
 output_catalog = 'analytics'
 output_database = 'dua_000000_ftr460'
 
-BATCH_SIZE = 100
-
 
 class VTINProcessor:
     """
-    This class processes the PUF_TIN_LIST table to populate VTIN identifiers.
+    This class processes the PUF_TIN_LIST table to populate VTIN identifiers using in-memory DataFrame operations.
     All methods are static as this is a utility class for organizing sequential operations.
     """
     
     @staticmethod
-    def _get_tin_records(*, output_catalog, output_database):
+    def _create_vtin_udf(*, main_key, main_modulus):
         """
-        Retrieve all TIN records from the PUF_TIN_LIST table.
-        Returns a list of Row objects with tin, vtin, cnt_bene_id, cnt_clm_id columns.
+        Create a User Defined Function (UDF) that generates VTINs for TINs.
+        Returns a UDF that can be used in DataFrame operations.
+        """
+        def generate_vtin(tin_value):
+            """
+            Generate a VTIN identifier for a given TIN using the VEIN class.
+            Returns the generated VTIN string or None if generation fails.
+            """
+            if tin_value is None:
+                return None
+            
+            try:
+                vtin_identifier = VEIN.VTIN_identifier(  # type: ignore
+                    ein=tin_value,
+                    main_key=main_key,
+                    modulus=main_modulus
+                )
+                return vtin_identifier
+            except Exception as e:
+                print(f"Error generating VTIN for TIN {tin_value}: {str(e)}")
+                return None
+        
+        # Register the UDF with Spark
+        return F.udf(generate_vtin, StringType())
+    
+    @staticmethod
+    def _load_tin_dataframe(*, output_catalog, output_database):
+        """
+        Load all TIN records from the PUF_TIN_LIST table into a DataFrame.
+        Returns a Spark DataFrame with tin, vtin, cnt_bene_id, cnt_clm_id columns.
         """
         select_sql = f"""
         SELECT tin, vtin, cnt_bene_id, cnt_clm_id
@@ -32,231 +59,181 @@ class VTINProcessor:
         ORDER BY tin
         """
         
-        print("Retrieving TIN records from PUF_TIN_LIST...")
+        print("Loading TIN records from PUF_TIN_LIST into DataFrame...")
         print(select_sql)
         
-        result = spark.sql(select_sql)  # type: ignore
-        return result.collect()
+        df = spark.sql(select_sql)  # type: ignore
+        record_count = df.count()
+        print(f"Loaded {record_count} TIN records into DataFrame")
+        
+        return df
     
     @staticmethod
-    def _generate_vtin_for_tin(*, tin_value, main_key, main_modulus):
+    def _process_vtins_in_memory(*, tin_df, main_key, main_modulus):
         """
-        Generate a VTIN identifier for a given TIN using the VEIN class.
-        Returns the generated VTIN string.
+        Process all TIN records in the DataFrame to generate VTINs using in-memory operations.
+        Returns a new DataFrame with populated VTIN values.
         """
-        try:
-            vtin_identifier = VEIN.VTIN_identifier(  # type: ignore
-                ein=tin_value,
-                main_key=main_key,
-                modulus=main_modulus
-            )
-            return vtin_identifier
-        except Exception as e:
-            print(f"Error generating VTIN for TIN {tin_value}: {str(e)}")
-            return None
+        print("Creating VTIN generation UDF...")
+        vtin_udf = VTINProcessor._create_vtin_udf(
+            main_key=main_key,
+            main_modulus=main_modulus
+        )
+        
+        print("Generating VTINs for all TINs in DataFrame...")
+        # Replace the vtin column with generated VTINs
+        processed_df = tin_df.withColumn("vtin", vtin_udf(F.col("tin")))
+        
+        # Cache the result since we'll be using it multiple times
+        processed_df.cache()
+        
+        return processed_df
     
     @staticmethod
-    def _create_batch_update_sql(*, tin_vtin_pairs, output_catalog, output_database):
+    def _create_vtin_table(*, processed_df, output_catalog, output_database, is_just_print):
         """
-        Create a batch UPDATE SQL statement for updating multiple TIN records.
-        Uses a CASE statement to update multiple records in a single operation.
+        Create the new PUF_VTIN_LIST table with processed VTIN data.
         """
-        if not tin_vtin_pairs:
-            return None
+        table_name = f"{output_catalog}.{output_database}.PUF_VTIN_LIST"
         
-        # Build the CASE statement for the SET clause
-        case_statements = []
-        tin_list = []
-        
-        for tin_value, vtin_value in tin_vtin_pairs:
-            if vtin_value is not None:
-                case_statements.append(f"WHEN tin = '{tin_value}' THEN '{vtin_value}'")
-                tin_list.append(f"'{tin_value}'")
-        
-        if not case_statements:
-            return None
-        
-        case_clause = "CASE " + " ".join(case_statements) + " END"
-        where_clause = "tin IN (" + ", ".join(tin_list) + ")"
-        
-        update_sql = f"""
-        UPDATE {output_catalog}.{output_database}.PUF_TIN_LIST
-        SET vtin = {case_clause}
-        WHERE {where_clause}
-        """
-        
-        return update_sql
-    
-    @staticmethod
-    def _process_tin_batch(*, tin_records_batch, main_key, main_modulus, output_catalog, output_database):
-        """
-        Process a batch of TIN records to generate VTINs and update the database.
-        """
-        tin_vtin_pairs = []
-        
-        # Generate VTINs for each TIN in the batch
-        for record in tin_records_batch:
-            tin_value = record['tin']
-            vtin_identifier = VTINProcessor._generate_vtin_for_tin(
-                tin_value=tin_value,
-                main_key=main_key,
-                main_modulus=main_modulus
-            )
+        if is_just_print:
+            print(f"Would create table: {table_name}")
+            print("Sample of processed data:")
+            processed_df.show(10)
+        else:
+            print(f"Creating table: {table_name}")
             
-            if vtin_identifier is not None:
-                tin_vtin_pairs.append((tin_value, vtin_identifier))
-            else:
-                print(f"Skipping TIN {tin_value} due to VTIN generation error")
-        
-        # Create and execute batch update SQL
-        if tin_vtin_pairs:
-            batch_update_sql = VTINProcessor._create_batch_update_sql(
-                tin_vtin_pairs=tin_vtin_pairs,
-                output_catalog=output_catalog,
-                output_database=output_database
-            )
+            # Drop the table if it exists
+            drop_sql = f"DROP TABLE IF EXISTS {table_name}"
+            print(f"Executing: {drop_sql}")
+            spark.sql(drop_sql)  # type: ignore
             
-            if batch_update_sql:
-                return batch_update_sql
-        
-        return None
-    
-    @staticmethod
-    def _create_batches(*, tin_records, batch_size):
-        """
-        Split the TIN records into batches of specified size.
-        Returns a list of batches, where each batch is a list of records.
-        """
-        batches = []
-        for i in range(0, len(tin_records), batch_size):
-            batch = tin_records[i:i + batch_size]
-            batches.append(batch)
-        return batches
+            # Create the new table
+            processed_df.write \
+                .mode("overwrite") \
+                .option("overwriteSchema", "true") \
+                .saveAsTable(table_name)
+            
+            print(f"Successfully created table: {table_name}")
     
     @staticmethod
     def _display_sample_results(*, output_catalog, output_database, sample_size=10):
         """
-        Display a sample of the updated PUF_TIN_LIST records to verify the updates.
+        Display a sample of the created PUF_VTIN_LIST records to verify the results.
         """
         sample_sql = f"""
         SELECT tin, vtin, cnt_bene_id, cnt_clm_id
-        FROM {output_catalog}.{output_database}.PUF_TIN_LIST
-        WHERE vtin != '                    '
+        FROM {output_catalog}.{output_database}.PUF_VTIN_LIST
+        WHERE vtin IS NOT NULL
         ORDER BY cnt_bene_id DESC
         LIMIT {sample_size}
         """
         
-        print(f"\nDisplaying sample of updated records (limit {sample_size}):")
+        print(f"\nDisplaying sample of created table records (limit {sample_size}):")
         print(sample_sql)
         
         result_df = spark.sql(sample_sql)  # type: ignore
         display(result_df)  # type: ignore
     
     @staticmethod
-    def _get_update_statistics(*, output_catalog, output_database):
+    def _get_processing_statistics(*, processed_df, output_catalog, output_database, is_just_print):
         """
-        Get statistics on the VTIN update process.
+        Get statistics on the VTIN processing results.
         """
-        stats_sql = f"""
-        SELECT 
-            COUNT(*) as total_records,
-            COUNT(CASE WHEN vtin != '                    ' THEN 1 END) as updated_records,
-            COUNT(CASE WHEN vtin = '                    ' THEN 1 END) as blank_records
-        FROM {output_catalog}.{output_database}.PUF_TIN_LIST
-        """
+        print("\nGetting processing statistics...")
         
-        print("\nGetting update statistics...")
-        print(stats_sql)
+        # Get statistics from the processed DataFrame
+        total_records = processed_df.count()
+        non_null_vtins = processed_df.filter(F.col("vtin").isNotNull()).count()
+        null_vtins = processed_df.filter(F.col("vtin").isNull()).count()
         
-        result = spark.sql(stats_sql)  # type: ignore
-        stats = result.collect()[0]
-        
-        total_records = stats['total_records']
-        updated_records = stats['updated_records']
-        blank_records = stats['blank_records']
-        
-        print(f"\nVTIN Update Statistics:")
+        print(f"\nVTIN Processing Statistics:")
         print(f"Total records: {total_records}")
-        print(f"Updated records: {updated_records}")
-        print(f"Blank records remaining: {blank_records}")
-        print(f"Update success rate: {(updated_records/total_records)*100:.1f}%")
+        print(f"Successfully processed VTINs: {non_null_vtins}")
+        print(f"Failed VTIN generations: {null_vtins}")
+        print(f"Success rate: {(non_null_vtins/total_records)*100:.1f}%")
+        
+        # If table was created, also get statistics from the table
+        if not is_just_print:
+            table_stats_sql = f"""
+            SELECT 
+                COUNT(*) as total_records,
+                COUNT(vtin) as non_null_vtins,
+                COUNT(CASE WHEN vtin IS NULL THEN 1 END) as null_vtins
+            FROM {output_catalog}.{output_database}.PUF_VTIN_LIST
+            """
+            
+            print(f"\nTable statistics:")
+            print(table_stats_sql)
+            
+            result = spark.sql(table_stats_sql)  # type: ignore
+            result.show()
+    
+    @staticmethod
+    def _show_vtin_examples(*, processed_df, sample_size=5):
+        """
+        Show examples of TIN -> VTIN mappings for verification.
+        """
+        print(f"\nShowing {sample_size} examples of TIN -> VTIN mappings:")
+        
+        examples_df = processed_df.filter(F.col("vtin").isNotNull()) \
+                                 .select("tin", "vtin") \
+                                 .limit(sample_size)
+        
+        examples_df.show(truncate=False)
     
     @staticmethod
     def execute_vtin_processing(*, is_just_print, main_key, main_modulus):
         """
         Main execution method that orchestrates the entire VTIN processing workflow.
-        Processes TIN records in batches to generate and update VTIN identifiers.
+        Loads all TINs into memory, processes VTINs, and creates the new PUF_VTIN_LIST table.
         """
-        print("Starting VTIN processing for PUF_TIN_LIST...")
+        print("Starting in-memory VTIN processing for PUF_TIN_LIST...")
         
-        # Step 1: Get all TIN records from the PUF_TIN_LIST table
-        tin_records = VTINProcessor._get_tin_records(
+        # Step 1: Load all TIN records into a DataFrame
+        tin_df = VTINProcessor._load_tin_dataframe(
             output_catalog=output_catalog,
             output_database=output_database
         )
         
-        if not tin_records:
+        if tin_df.count() == 0:
             print("No TIN records found in PUF_TIN_LIST. Exiting.")
             return
         
-        print(f"Found {len(tin_records)} TIN records to process")
-        
-        # Step 2: Split records into batches
-        batches = VTINProcessor._create_batches(
-            tin_records=tin_records,
-            batch_size=BATCH_SIZE
+        # Step 2: Process all VTINs in memory
+        processed_df = VTINProcessor._process_vtins_in_memory(
+            tin_df=tin_df,
+            main_key=main_key,
+            main_modulus=main_modulus
         )
         
-        print(f"Processing {len(batches)} batches of up to {BATCH_SIZE} records each")
+        # Step 3: Show examples of the processing results
+        VTINProcessor._show_vtin_examples(processed_df=processed_df)
         
-        # Step 3: Process each batch
-        successful_batches = 0
-        total_sql_statements = []
+        # Step 4: Create the new PUF_VTIN_LIST table
+        VTINProcessor._create_vtin_table(
+            processed_df=processed_df,
+            output_catalog=output_catalog,
+            output_database=output_database,
+            is_just_print=is_just_print
+        )
         
-        for batch_index, batch in enumerate(batches, 1):
-            print(f"\nProcessing batch {batch_index}/{len(batches)} ({len(batch)} records)")
-            
-            batch_update_sql = VTINProcessor._process_tin_batch(
-                tin_records_batch=batch,
-                main_key=main_key,
-                main_modulus=main_modulus,
-                output_catalog=output_catalog,
-                output_database=output_database
-            )
-            
-            if batch_update_sql:
-                total_sql_statements.append(batch_update_sql)
-                
-                if is_just_print:
-                    print(f"Batch {batch_index} SQL (printing only):")
-                    print(batch_update_sql)
-                    print("---")
-                else:
-                    print(f"Executing batch {batch_index} update...")
-                    try:
-                        spark.sql(batch_update_sql)  # type: ignore
-                        successful_batches += 1
-                        print(f"Batch {batch_index} completed successfully")
-                    except Exception as e:
-                        print(f"Error executing batch {batch_index}: {str(e)}")
-            else:
-                print(f"Batch {batch_index} skipped - no valid updates")
+        # Step 5: Display results and statistics
+        VTINProcessor._get_processing_statistics(
+            processed_df=processed_df,
+            output_catalog=output_catalog,
+            output_database=output_database,
+            is_just_print=is_just_print
+        )
         
-        # Step 4: Display results and statistics
         if not is_just_print:
-            print(f"\nProcessed {successful_batches}/{len(batches)} batches successfully")
-            
-            VTINProcessor._get_update_statistics(
-                output_catalog=output_catalog,
-                output_database=output_database
-            )
-            
             VTINProcessor._display_sample_results(
                 output_catalog=output_catalog,
                 output_database=output_database
             )
-        else:
-            print(f"\nGenerated {len(total_sql_statements)} SQL statements for {len(batches)} batches")
+        
+        # Clean up cached DataFrame
+        processed_df.unpersist()
         
         print("\nVTIN processing completed!")
 
