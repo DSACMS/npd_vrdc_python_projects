@@ -64,66 +64,6 @@ class TINProcessor:
         
         return " UNION ALL ".join(union_parts)
     
-    @staticmethod
-    def _create_temp_view(*, union_query):
-        """
-        Create a temporary view from the union query for easier processing.
-        """
-        temp_view_sql = f"""
-        CREATE OR REPLACE TEMPORARY VIEW temp_tin_records AS
-        {union_query}
-        """
-        return temp_view_sql
-    
-    @staticmethod
-    def _create_tin_summary_table(*, output_catalog, output_database):
-        """
-        Create the main TIN summary table with beneficiary and claim counts.
-        """
-        summary_sql = f"""
-        CREATE TABLE {output_catalog}.{output_database}.X_TIN_LIST AS
-        SELECT 
-            tin,
-            COUNT(DISTINCT bene_id) AS cnt_bene_id,
-            COUNT(DISTINCT clm_id) AS cnt_clm_id
-        FROM temp_tin_records
-        GROUP BY tin
-        """
-        return summary_sql
-    
-    @staticmethod
-    def _create_puf_tin_table(*, output_catalog, output_database):
-        """
-        Create the PUF (Public Use File) TIN table with privacy filtering.
-        Only includes TINs with more than 10 unique beneficiaries.
-
-        Filter out the junk data of '000000000' And make a 20 character space for vtin
-
-        """
-        puf_sql = f"""
-        CREATE TABLE {output_catalog}.{output_database}.PUF_TIN_LIST AS
-        SELECT 
-            tin, 
-            '                    ' AS vtin,
-            cnt_bene_id,
-            cnt_clm_id
-        FROM {output_catalog}.{output_database}.X_TIN_LIST 
-        WHERE cnt_bene_id > 10
-        AND tin != '000000000'
-        """
-        return puf_sql
-    
-    @staticmethod
-    def _display_results(*, output_catalog, output_database):
-        """
-        Display the final PUF TIN list results.
-        """
-        display_sql = f"""
-        SELECT * 
-        FROM {output_catalog}.{output_database}.PUF_TIN_LIST
-        ORDER BY cnt_bene_id DESC
-        """
-        return display_sql
     
     @staticmethod
     def execute_tin_processing(*, is_just_print ):
@@ -149,24 +89,55 @@ class TINProcessor:
             rif_catalog=rif_catalog,
             rif_database=rif_database
         )
-        temp_view_sql = TINProcessor._create_temp_view(union_query=union_query)
         
-        # Step 3: Create main summary table
-        summary_sql = TINProcessor._create_tin_summary_table(
-            output_catalog=output_catalog,
-            output_database=output_database
-        )
+        # Step 3: Create SQL statements using f-strings directly
+        temp_view_sql = f"""
+        CREATE OR REPLACE TEMPORARY VIEW temp_tin_records AS
+        {union_query}
+        """
         
-        # Step 4: Create PUF table with privacy filtering
-        puf_sql = TINProcessor._create_puf_tin_table(
-            output_catalog=output_catalog,
-            output_database=output_database
-        )
+        drop_x_tin_sql = f"""
+        DROP TABLE IF EXISTS {output_catalog}.{output_database}.X_TIN_LIST
+        """
+        
+        summary_sql = f"""
+        CREATE TABLE {output_catalog}.{output_database}.X_TIN_LIST AS
+        SELECT 
+            tin,
+            COUNT(DISTINCT bene_id) AS cnt_bene_id,
+            COUNT(DISTINCT clm_id) AS cnt_clm_id
+        FROM temp_tin_records
+        GROUP BY tin
+        """
+        
+        drop_puf_tin_sql = f"""
+        DROP TABLE IF EXISTS {output_catalog}.{output_database}.PUF_TIN_LIST
+        """
+        
+        puf_sql = f"""
+        CREATE TABLE {output_catalog}.{output_database}.PUF_TIN_LIST AS
+        SELECT 
+            tin, 
+            '                    ' AS vtin,
+            cnt_bene_id,
+            cnt_clm_id
+        FROM {output_catalog}.{output_database}.X_TIN_LIST 
+        WHERE cnt_bene_id > 10
+        AND tin != '000000000'
+        """
+        
+        display_sql = f"""
+        SELECT * 
+        FROM {output_catalog}.{output_database}.PUF_TIN_LIST
+        ORDER BY cnt_bene_id DESC
+        """
         
         # Execute all SQL commands in sequence
         sql_dict = {
             "Create temporary view from union of all TIN tables": temp_view_sql,
+            "Drop X_TIN_LIST table if exists": drop_x_tin_sql,
             "Create X_TIN_LIST table with aggregated counts": summary_sql,
+            "Drop PUF_TIN_LIST table if exists": drop_puf_tin_sql,
             "Create PUF_TIN_LIST table with privacy filtering": puf_sql
         }
         
@@ -179,12 +150,7 @@ class TINProcessor:
                 print("Running:\n")
                 spark.sql(sql)  # type: ignore
         
-        # Step 5: Display results using Databricks display function
-        display_sql = TINProcessor._display_results(
-            output_catalog=output_catalog,
-            output_database=output_database
-        )
-        
+        # Step 4: Display results using Databricks display function
         print(f"\nDisplaying final PUF TIN list:")
         print(display_sql)
         result_df = spark.sql(display_sql)  # type: ignore
