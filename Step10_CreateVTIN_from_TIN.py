@@ -96,12 +96,20 @@ class TINProcessor:
         """
         Create the PUF (Public Use File) TIN table with privacy filtering.
         Only includes TINs with more than 10 unique beneficiaries.
+
+        Filter out the junk data of '000000000' And make a 20 character space for vtin
+
         """
         puf_sql = f"""
         CREATE TABLE {output_catalog}.{output_database}.PUF_TIN_LIST AS
-        SELECT * 
+        SELECT 
+            tin, 
+            '                    ' AS vtin,
+            cnt_bene_id,
+            cnt_clm_id
         FROM {output_catalog}.{output_database}.X_TIN_LIST 
         WHERE cnt_bene_id > 10
+        AND tin != '000000000'
         """
         return puf_sql
     
