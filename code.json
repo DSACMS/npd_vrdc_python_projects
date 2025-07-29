@@ -1,0 +1,35 @@
+{
+  "name": "vrdc_vtin_to_npi",
+  "description": "Calculate VTINs for a VRDC PUF",
+  "permissions": {
+    "licenses": [
+      {
+        "name": "CC0-1.0",
+        "URL": "https://raw.githubusercontent.com/DSACMS/npd_vrdc_python_projects/refs/heads/main/LICENSE"
+      }
+    ],
+    "usageType": "openSource",
+    "exemptionText": ""
+  },
+  "repositoryURL": "https://github.com/DSACMS/npd_vrdc_python_projects",
+  "repositoryVisibility": "public",
+  "laborHours": 1912.602,
+  "reuseFrequency": {
+    "forks": 0,
+    "clones": 8
+  },
+  "maintenance": "none",
+  "contractNumber": "none",
+  "tags": [
+    "python",
+    "VTN"
+  ],
+  "contact": {
+    "email": "opensource@cms.hhs.gov",
+    "name": ""
+  },
+  "feedbackMechanisms": [
+    "https://github.com/DSACMS/npd_vrdc_python_projects/issues"
+  ],
+  "AIUseCaseInventory": false
+}
