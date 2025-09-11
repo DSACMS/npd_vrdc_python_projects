@@ -1,12 +1,12 @@
 # Note: you must have an appropriate role chosen and the IDRC_PRD_COMM_WH warehouse selected
 
 # Import python packages
-import streamlit as st
+import streamlit as st # type: ignore
 import pandas as pd
 from datetime import datetime
 
 # We can also use Snowpark for our analyses!
-from snowflake.snowpark.context import get_active_session
+from snowflake.snowpark.context import get_active_session # type: ignore
 session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
