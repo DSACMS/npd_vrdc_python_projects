@@ -48,3 +48,13 @@ session.sql(address_sql).collect()
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
 # Or look in ../idr_data/ for idr_data/download_and_merge_all_snowflake_csv.sh which downloads the data from idr and then re-merges the csv files. 
+
+"""
+possible NPI query
+SELECT my_string,
+       CASE 
+         WHEN my_string ~ '^[1][0-9]{9}$' THEN 'Looks like an NPI'
+         ELSE 'Not an NPI'
+       END AS npi_flag
+FROM my_table;
+"""
