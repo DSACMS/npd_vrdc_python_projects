@@ -11,7 +11,7 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-license_file_name = f"@~/pecos_recent_practice_address.{ts}.csv"
+license_file_name = f"@~/pecos_unexpired_license.{ts}.csv"
 
 
 now = datetime.now()
@@ -44,7 +44,6 @@ FILE_FORMAT = (
   COMPRESSION = NONE
 )
 HEADER = TRUE
-SINGLE = TRUE
 OVERWRITE = TRUE;
 """
 
