@@ -1,0 +1,46 @@
+# Note: you must have an appropriate role chosen and the IDRC_PRD_COMM_WH warehouse selected
+
+# Import python packages
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+
+# We can also use Snowpark for our analyses!
+from snowflake.snowpark.context import get_active_session
+session = get_active_session()
+
+address_sql = f"""
+SELECT 
+    PRVDR_NPI_NUM,
+    ADR_TYPE_DESC,
+    LINE_1_ADR,
+    LINE_2_ADR,
+    GEO_USPS_STATE_CD,
+    ZIP5_CD,
+    ZIP4_CD,
+    CNTRY_CD,
+    PHNE_NUM,
+    FAX_NUM,
+    YEAR(IDR_UPDT_TS) AS IDR_UPDT_TS_YEAR,
+    YEAR(IDR_TRANS_OBSLT_TS) AS IDR_TRANS_OBSLT_TS_YEAR,
+    YEAR(IDR_TRANS_EFCTV_TS) AS IDR_TRANS_EFCTV_TS_YEAR
+    
+FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_ADR_HSTRY
+WHERE YEAR(IDR_TRANS_OBSLT_TS) = 9999 AND YEAR(IDR_TRANS_EFCTV_TS) > 2022 AND ADR_TYPE_DESC = 'PRACTICE'
+
+"""
+
+df = session.sql(address_sql).to_pandas()
+
+ts = datetime.now().strftime("%Y_%m_%d_%H%M")
+
+address_file_name = f"pecos_recent_practice_address.{ts}.csv"
+
+session.file.put_stream(
+    df.to_csv(address_file_name, index = False),
+    f"@~/{address_file_name}",
+    auto_compress=False
+)
+
+# To download use: 
+# snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
