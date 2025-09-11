@@ -9,11 +9,18 @@ from datetime import datetime
 from snowflake.snowpark.context import get_active_session
 session = get_active_session()
 
+ts = datetime.now().strftime("%Y_%m_%d_%H%M")
+
+license_file_name = f"@~/pecos_recent_practice_address.{ts}.csv"
+
+
 now = datetime.now()
 last_year = now.year - 1 
 
 
-address_sql = f"""
+license_sql = f"""
+COPY INTO {license_file_name}
+FROM (
 SELECT
     PRVDR_NPI_NUM,
     PRVDR_ENRLMT_LCNS_STATE_CD,
@@ -29,20 +36,20 @@ JOIN IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_SPCLTY_CRNT AS enrollment_sp
     enrollment_speciality.prvdr_enrlmt_id =
     enrollment_to_npi.prvdr_enrlmt_id
 WHERE YEAR(PRVDR_ENRLMT_LCNS_EXPRTN_DT) > {last_year}
-
+)
+FILE_FORMAT = (
+  TYPE = CSV
+  FIELD_DELIMITER = ','
+  FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+  COMPRESSION = NONE
+)
+HEADER = TRUE
+SINGLE = TRUE
+OVERWRITE = TRUE;
 """
 
-df = session.sql(address_sql).to_pandas()
+session.sql(license_sql).collect()
 
-ts = datetime.now().strftime("%Y_%m_%d_%H%M")
-
-address_file_name = f"pecos_recent_practice_address.{ts}.csv"
-
-session.file.put_stream(
-    df.to_csv(address_file_name, index = False),
-    f"@~/{address_file_name}",
-    auto_compress=False
-)
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
