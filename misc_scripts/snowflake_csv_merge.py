@@ -41,14 +41,22 @@ def merge_group(root, files, outdir="."):
     outname = os.path.join(outdir, f"{root}.merged.csv")
     print(f"Merging {len(files)} files into {outname}")
 
-    # Read first file with header
-    df = pd.read_csv(files[0], compression="infer")
-    # Append others without header
+    # Read first file with header to establish column structure
+    df = pd.read_csv(files[0], compression="infer", dtype=str)
+    expected_headers = list(df.columns)
+    
+    # Append others, validating headers match
     for f in files[1:]:
-        df2 = pd.read_csv(f, header=None, compression="infer")
+        df2 = pd.read_csv(f, compression="infer", dtype=str)
+        
+        # Validate headers match exactly
+        if list(df2.columns) != expected_headers:
+            raise ValueError(f"Header mismatch in file {f}. Expected: {expected_headers}, Got: {list(df2.columns)}")
+        
         df = pd.concat([df, df2], ignore_index=True)
 
     df.to_csv(outname, index=False)
+    print(f"Successfully merged {len(files)} files with {len(df)} total rows (excluding header)")
 
 def main():
     parser = argparse.ArgumentParser(
