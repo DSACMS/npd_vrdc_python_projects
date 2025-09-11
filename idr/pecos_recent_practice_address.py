@@ -47,3 +47,4 @@ session.sql(address_sql).collect()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
+# Or look in ../idr_data/ for idr_data/download_and_merge_all_snowflake_csv.sh which downloads the data from idr and then re-merges the csv files. 
