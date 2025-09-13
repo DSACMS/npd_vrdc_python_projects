@@ -22,6 +22,7 @@ SELECT
     LINE_1_ADR,
     LINE_2_ADR,
     GEO_USPS_STATE_CD,
+    ADR_CITY_NAME,
     ZIP5_CD,
     ZIP4_CD,
     CNTRY_CD,
