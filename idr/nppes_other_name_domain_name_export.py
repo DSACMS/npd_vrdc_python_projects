@@ -1,7 +1,7 @@
 
 """
 ==========
-NPPES Domain Name Export
+NPPES Other Name Domain Name Export
 ==========
 
 Extracts a list of the common domain names associated with provider email addresses, where that field is not null.
