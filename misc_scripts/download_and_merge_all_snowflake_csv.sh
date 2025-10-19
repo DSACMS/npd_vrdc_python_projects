@@ -1,11 +1,13 @@
 #!/bin/sh
+# Script assumes that ~/cms_data_downloads_possible_pii/idr_data/ is exists and is devoted to this process.. it should also have sub-directory of unmerged_csv_files
+# intentionally hardcoded to prevent accidental csv inclusion in github etc. 
 # Delete the previous run
-rm unmerged_csv_files/*.csv
+rm ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/*.csv
 # move to the download directory to being the download
-cd ./unmerged_csv_files/
+pushd ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/
 # download using snowsql. You must have cms_idr configured for snowflake
 snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
 # go back the main directory
-cd ..
+popd
 # merge the new csv file here. 
-python3 ../misc_scripts/snowflake_csv_merge.py ./unmerged_csv_files/ --output-dir .
+python3 ./snowflake_csv_merge.py ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/ --output-dir ~/cms_data_downloads_possible_pii/idr_data/
