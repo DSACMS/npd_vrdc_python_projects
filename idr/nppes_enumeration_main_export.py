@@ -38,7 +38,7 @@ else:
     pii_col_content = 'Provider_PII_obscured'
     pii_comment_out = '--' # SQL comment filters out problematic pii
 
-nppes_IDR_main_export_filename = f"@~/medicaid_credentials.{pii_col_content}.{ts}.csv"
+nppes_IDR_main_export_filename = f"@~/nppes_main_idr_export.{pii_col_content}.{ts}.csv"
 
 nppes_IDR_main_export_sql = f"""
 COPY INTO {nppes_IDR_main_export_filename}""" + f"""
