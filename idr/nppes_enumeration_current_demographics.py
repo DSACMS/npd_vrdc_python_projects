@@ -2,6 +2,12 @@
 """
 Current Demographics table export for IDR NPPES. Contains most of the main file along with some inside-cms only data. 
 
+Methods applied to obscure covert pii into exportable data. 
+
+Uses the same salt as the tinhash etc. 
+
+is_export_pii is set to False for now. As NPPES replacement approaches we will need to change this decision
+
 """
 # Note: you must have an appropriate role chosen and the IDRC_PRD_COMM_WH warehouse selected
 
@@ -16,20 +22,38 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-medicaid_credentials_file_name = f"@~/medicaid_credentials.{ts}.csv"
 
-medicaid_credentials_sql = f"""
-COPY INTO {medicaid_credentials_file_name}""" + """
+
+is_export_pii = False
+
+if(is_export_pii):
+    pii_col_content = 'File_Contains_Provider_PII'
+    pii_comment_out = '' # no SQL comment so we are getting this column of data
+else:
+    pii_col_content = 'Provider_PII_obscured'
+    pii_comment_out = '--' # SQL comment filters out problematic pii
+
+nppes_IDR_main_export_filename = f"@~/medicaid_credentials.{pii_col_content}.{ts}.csv"
+
+nppes_IDR_main_export_sql = f"""
+COPY INTO {nppes_IDR_main_export_filename}""" + """
 FROM (
             SELECT
+                '{pii_col_content}' AS does_file_contain_pii
                 PRVDR_NPI_NUM,
                 PRVDR_ENT_TYPE_CD,
                 PRVDR_ENT_TYPE_DESC,
                 PRVDR_CRTFCTN_DT,
                 PRVDR_RPLCMT_NPI_NUM,
-                PRVDR_SSN_NUM, -- PII
-                PRVDR_TIN_NUM, -- possible PII when not null
-                PRVDR_EIN_NUM,
+
+                {pii_comment_out} PRVDR_SSN_NUM, --pii
+                {pii_comment_out} PRVDR_TIN_NUM, --pii
+                {pii_comment_out} PRVDR_EIN_NUM, --possible pii
+                -- salt is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
+                SHA2('{salt}' || PRVDR_SSN_NUM, 512) AS PRVDR_SSN_NUM_salted_hash_sha512 ,
+                SHA2('{salt}' || PRVDR_TIN_NUM, 512) AS PRVDR_TIN_NUM_salted_hash_sha512 , -- rarely used.
+                SHA2('{salt}' || PRVDR_EIN_NUM, 512) AS PRVDR_EIN_NUM_salted_hash_sha512 ,
+
                 PRVDR_ENMRTN_DT,
                 PRVDR_LAST_UPDT_DT,
                 PRVDR_DEACTVTN_RSN_CD,
@@ -37,12 +61,24 @@ FROM (
                 PRVDR_DEACTVTN_DT,
                 PRVDR_REACTVTN_DT,
                 PRVDR_GNDR_CD,
-                PRVDR_BIRTH_USPS_STATE_CD,
-                PRVDR_BIRTH_CNTRY_CD,
+
+                {pii_comment_out} PRVDR_BIRTH_USPS_STATE_CD, -- pii 
+                {pii_comment_out} PRVDR_BIRTH_CNTRY_CD, -- pii
+                {pii_comment_out} PRVDR_BIRTH_DT, -- pii
+                CONCAT(
+                        FLOOR(PRVDR_BIRTH_DT / 5) * 5,
+                            '-',
+                            FLOOR(PRVDR_BIRTH_DT / 5) * 5 + 4
+                ) AS PRVDR_BIRTH_DT_five_year_birth_span -- blurred indication of general provider age. 
+
                 PRVDR_SOLE_PRPRTR_CD,
+
                 PRVDR_ORG_SUBRDNT_CD,
-                PRVDR_PRNT_ORG_TIN_NUM,
-                PRVDR_PRMRY_LANG_TXT, -- greenlocked!!! 
+                {pii_comment_out} PRVDR_PRNT_ORG_TIN_NUM, --possible pii
+                SHA2('{salt}' || PRVDR_PRNT_ORG_TIN_NUM, 512) AS PRVDR_PRNT_ORG_TIN_NUM_salted_hash_sha512
+
+                {pii_comment_out} PRVDR_PRMRY_LANG_TXT, -- pii which is further greenlocked!!! 
+
                 PRVDR_PREX_NAME,
                 PRVDR_1ST_NAME,
                 PRVDR_MDL_NAME,
@@ -83,7 +119,7 @@ HEADER = TRUE
 OVERWRITE = TRUE;
 """
 
-session.sql(medicaid_credentials_sql).collect()
+session.sql(nppes_IDR_main_export_sql).collect()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

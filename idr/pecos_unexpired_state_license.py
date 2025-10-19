@@ -14,15 +14,15 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-license_file_name = f"@~/pecos_unexpired_license.{ts}.csv"
+pecos_license_file_name = f"@~/pecos_unexpired_license.{ts}.csv"
 
 
 now = datetime.now()
 last_year = now.year - 1 
 
 
-license_sql = f"""
-COPY INTO {license_file_name}
+pecos_license_sql = f"""
+COPY INTO {pecos_license_file_name}
 FROM (
     SELECT
         PRVDR_NPI_NUM,
@@ -50,7 +50,7 @@ HEADER = TRUE
 OVERWRITE = TRUE;
 """
 
-session.sql(license_sql).collect()
+session.sql(pecos_license_sql).collect()
 
 
 # To download use: 

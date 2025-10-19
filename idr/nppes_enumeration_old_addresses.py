@@ -26,10 +26,10 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-medicaid_credentials_file_name = f"@~/medicaid_credentials.{ts}.csv"
+nppes_old_address_file_name = f"@~/nppes_old_addresses.{ts}.csv"
 
-medicaid_credentials_sql = f"""
-COPY INTO {medicaid_credentials_file_name}""" + """
+nppes_old_addresses_sql = f"""
+COPY INTO {nppes_old_address_file_name}""" + """
 FROM (
         SELECT 
             address_history_outside.PRVDR_NPI_NUM,
@@ -72,7 +72,7 @@ HEADER = TRUE
 OVERWRITE = TRUE;
 """
 
-session.sql(medicaid_credentials_sql).collect()
+session.sql(nppes_old_addresses_sql).collect()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

@@ -15,9 +15,9 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-address_file_name = f"@~/pecos_recent_practice_address.{ts}.csv"
+pecos_recent_address_file_name = f"@~/pecos_recent_practice_address.{ts}.csv"
 
-address_sql = f"""
+pecos_recent_address_sql = f"""
 COPY INTO {address_file_name}
 FROM (
     SELECT 
@@ -48,7 +48,7 @@ HEADER = TRUE
 OVERWRITE = TRUE;
 """
 
-session.sql(address_sql).collect()
+session.sql(pecos_recent_address_sql).collect()
 
 
 summary_address_file_name = f"@~/pecos_address_summary.{ts}.csv"

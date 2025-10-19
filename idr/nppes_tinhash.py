@@ -32,6 +32,7 @@ FROM (
       PRVDR_ENT_TYPE_CD,
       PRVDR_ORG_SUBRDNT_CD,
       ORG_NAME,
+      -- salt is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
       SHA2('{salt}' || PRVDR_EIN_NUM, 512) AS tin_salted_hash_sha512,
       FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_DMGRPHCS_CRNT
       WHERE PRVDR_EIN_NUM IS NOT NULL
