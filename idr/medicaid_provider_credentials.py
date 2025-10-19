@@ -1,3 +1,16 @@
+"""
+This script downloads Medicaid provider credential data, focusing on licenses and license numbers. It performs the following tasks:
+	•	Retrieves the list of licenses associated with each provider.
+	•	Extracts key fields including:
+	•	License type code
+	•	License type description
+	•	License number
+	•	Resolves license type codes using a lookup table.
+	•	Limits results to providers with valid state-level Medicare codes.
+	•	Excludes license entries that are clearly not useful — for example, records that only restate the NPI instead of a real license.
+
+"""
+
 # Note: you must have an appropriate role chosen and the IDRC_PRD_COMM_WH warehouse selected
 
 # Import python packages

@@ -1,3 +1,18 @@
+
+"""
+This script downloads historical NPPES provider street address information on a per-NPI basis. 
+
+The data it retrieves includes:
+	•	Street address details
+	•	Phone numbers
+	•	Fax numbers
+	•	The year and month when the address was first entered into NPPES
+	•	The year and month when the address was deleted or removed from NPPES
+
+Day-level precision is intentionally excluded. We only retain year and month to avoid inadvertently creating a linkable dataset using exact dates; 
+month-level granularity is sufficient to track when addresses change without increasing data-linking risk.
+
+"""
 # Note: you must have an appropriate role chosen and the IDRC_PRD_COMM_WH warehouse selected
 
 # Import python packages
