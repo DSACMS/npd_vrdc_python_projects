@@ -1,6 +1,6 @@
 """
 ==========
-PECOS ORG (TINHashed) to Organizational NPI Export
+NPPES Provider ORG TINHashed to Organizational NPI Export
 ==========
 
 

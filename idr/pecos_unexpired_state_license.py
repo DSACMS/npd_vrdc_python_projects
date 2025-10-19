@@ -1,6 +1,6 @@
 """
 ==========
-PECOS Unexpired State Licenses Per NPI
+PECOS Unexpired Provider State Licenses Per NPI
 ==========
 
 """

@@ -1,6 +1,6 @@
 """
 ==========
-Medicaid Provider Credential Export
+Medicaid Provider Licensing Credential Export
 ==========
 
 
