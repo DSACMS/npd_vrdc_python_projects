@@ -126,7 +126,7 @@ FROM (
                 
 
             FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_DMGRPHCS_CRNT
-)
+)""" + """
 FILE_FORMAT = (
   TYPE = CSV
   FIELD_DELIMITER = ','

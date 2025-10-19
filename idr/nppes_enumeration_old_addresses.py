@@ -34,7 +34,7 @@ ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 nppes_old_address_file_name = f"@~/nppes_old_addresses.{ts}.csv"
 
 nppes_old_addresses_sql = f"""
-COPY INTO {nppes_old_address_file_name}""" + """
+COPY INTO {nppes_old_address_file_name}
 FROM (
         SELECT 
             address_history_outside.PRVDR_NPI_NUM,
@@ -66,7 +66,7 @@ FROM (
             )
         WHERE YEAR(address_history_outside.IDR_TRANS_OBSLT_TS) < 9000
         ORDER BY address_history_outside.PRVDR_NPI_NUM DESC
-)
+)""" + """
 FILE_FORMAT = (
   TYPE = CSV
   FIELD_DELIMITER = ','

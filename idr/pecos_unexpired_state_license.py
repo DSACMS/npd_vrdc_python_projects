@@ -42,7 +42,7 @@ FROM (
         enrollment_speciality.prvdr_enrlmt_id =
         enrollment_to_npi.prvdr_enrlmt_id
     WHERE YEAR(PRVDR_ENRLMT_LCNS_EXPRTN_DT) > {last_year}
-)
+)""" + """
 FILE_FORMAT = (
   TYPE = CSV
   FIELD_DELIMITER = ','
