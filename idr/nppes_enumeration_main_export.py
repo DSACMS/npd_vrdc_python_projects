@@ -27,7 +27,7 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-
+local_pepper = pepper # This simgle line should have a warning.. because pepper should not be defined in this file.
 
 is_export_pii = False
 
@@ -57,15 +57,15 @@ FROM (
                 -- pepper is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
                 
                 CASE WHEN PRVDR_SSN_NUM IS NOT NULL THEN 
-                    SHA2('{pepper}' || PRVDR_SSN_NUM, 512)
+                    SHA2('{local_pepper}' || PRVDR_SSN_NUM, 512)
                 ELSE NULL END AS PRVDR_SSN_NUM_peppered_hash_sha512,
 
                 CASE WHEN PRVDR_TIN_NUM IS NOT NULL THEN 
-                    SHA2('{pepper}' || PRVDR_TIN_NUM, 512)
+                    SHA2('{local_pepper}' || PRVDR_TIN_NUM, 512)
                 ELSE NULL END AS PRVDR_TIN_NUM_peppered_hash_sha512,
 
                 CASE WHEN PRVDR_EIN_NUM IS NOT NULL THEN 
-                    SHA2('{pepper}' || PRVDR_EIN_NUM, 512)
+                    SHA2('{local_pepper}' || PRVDR_EIN_NUM, 512)
                 ELSE NULL END AS PRVDR_EIN_NUM_peppered_hash_sha512,
 
                 PRVDR_ENMRTN_DT,
@@ -92,7 +92,7 @@ FROM (
                 
 
                 CASE WHEN PRVDR_PRNT_ORG_TIN_NUM IS NOT NULL THEN 
-                    SHA2('{pepper}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
+                    SHA2('{local_pepper}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
                 ELSE NULL END AS PRVDR_PRNT_ORG_TIN_NUM_peppered_hash_sha512,
 
                 {pii_comment_out} PRVDR_PRMRY_LANG_TXT, -- pii which is further greenlocked!!! 
