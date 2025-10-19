@@ -29,7 +29,7 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-medicaid_credentials_file_name = f"@~/medicaid_credentials.{ts}.csv"
+medicaid_credentials_file_name = f"@~/medicaid_provider_credentials.{ts}.csv"
 
 medicaid_credentials_sql = f"""
 COPY INTO {medicaid_credentials_file_name}
