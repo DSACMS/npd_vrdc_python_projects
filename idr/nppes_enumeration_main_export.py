@@ -55,9 +55,18 @@ FROM (
                 {pii_comment_out} PRVDR_TIN_NUM, --pii
                 {pii_comment_out} PRVDR_EIN_NUM, --possible pii
                 -- salt is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
-                SHA2('{salt}' || PRVDR_SSN_NUM, 512) AS PRVDR_SSN_NUM_salted_hash_sha512 ,
-                SHA2('{salt}' || PRVDR_TIN_NUM, 512) AS PRVDR_TIN_NUM_salted_hash_sha512 , -- rarely used.
-                SHA2('{salt}' || PRVDR_EIN_NUM, 512) AS PRVDR_EIN_NUM_salted_hash_sha512 ,
+                
+                CASE WHEN PRVDR_SSN_NUM IS NOT NULL THEN 
+                    SHA2('{salt}' || PRVDR_SSN_NUM, 512)
+                ELSE NULL END AS PRVDR_SSN_NUM_salted_hash_sha512,
+
+                CASE WHEN PRVDR_TIN_NUM IS NOT NULL THEN 
+                    SHA2('{salt}' || PRVDR_TIN_NUM, 512)
+                ELSE NULL END AS PRVDR_TIN_NUM_salted_hash_sha512,
+
+                CASE WHEN PRVDR_EIN_NUM IS NOT NULL THEN 
+                    SHA2('{salt}' || PRVDR_EIN_NUM, 512)
+                ELSE NULL END AS PRVDR_EIN_NUM_salted_hash_sha512,
 
                 PRVDR_ENMRTN_DT,
                 PRVDR_LAST_UPDT_DT,
@@ -80,8 +89,12 @@ FROM (
 
                 PRVDR_ORG_SUBRDNT_CD,
                 {pii_comment_out} PRVDR_PRNT_ORG_TIN_NUM, --possible pii
-                SHA2('{salt}' || PRVDR_PRNT_ORG_TIN_NUM, 512) AS PRVDR_PRNT_ORG_TIN_NUM_salted_hash_sha512
+                
 
+                CASE WHEN PRVDR_PRNT_ORG_TIN_NUM IS NOT NULL THEN 
+                    SHA2('{salt}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
+                ELSE NULL END AS PRVDR_PRNT_ORG_TIN_NUM_salted_hash_sha512,
+                
                 {pii_comment_out} PRVDR_PRMRY_LANG_TXT, -- pii which is further greenlocked!!! 
 
                 PRVDR_PREX_NAME,
