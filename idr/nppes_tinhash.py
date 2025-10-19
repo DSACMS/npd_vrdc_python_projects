@@ -6,7 +6,7 @@ This program relies on the 'salt' variable being set in a previous notebook.
 not setting this in the scope of this program ensures that we do not accidentally 
 record the salt into git. Not quite as bad as a password.. but still bad. 
 
-The salt should be changed every run. 
+Under the current model, the salt should be changed every run. But it should be used for all the various EIN Perumations. 
 
 """
 
@@ -28,13 +28,13 @@ nppes_onpi_tin_file_name = f"@~/nppes_onpi_tin.{ts}.csv"
 nppes_onpi_tin_sql = f"""
 COPY INTO {nppes_onpi_tin_file_name}
 FROM (
-SELECT PRVDR_NPI_NUM, 
-PRVDR_ENT_TYPE_CD,
-PRVDR_ORG_SUBRDNT_CD,
-ORG_NAME,
-SHA2('{salt}' || PRVDR_EIN_NUM, 512) AS tin_salted_hash_sha512,
-FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_DMGRPHCS_CRNT
-WHERE PRVDR_EIN_NUM IS NOT NULL
+      SELECT PRVDR_NPI_NUM, 
+      PRVDR_ENT_TYPE_CD,
+      PRVDR_ORG_SUBRDNT_CD,
+      ORG_NAME,
+      SHA2('{salt}' || PRVDR_EIN_NUM, 512) AS tin_salted_hash_sha512,
+      FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_DMGRPHCS_CRNT
+      WHERE PRVDR_EIN_NUM IS NOT NULL
 )
 FILE_FORMAT = (
   TYPE = CSV

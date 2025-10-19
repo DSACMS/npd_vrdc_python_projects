@@ -24,21 +24,21 @@ last_year = now.year - 1
 license_sql = f"""
 COPY INTO {license_file_name}
 FROM (
-SELECT
-    PRVDR_NPI_NUM,
-    PRVDR_ENRLMT_LCNS_STATE_CD,
-    PRVDR_ENRLMT_LCNS_NUM, 
-    PRVDR_ENRLMT_FORM_CD,
-    PRVDR_ENRLMT_SPCLTY_CD,
-    PRVDR_ENRLMT_SPCLTY_DESC
-FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_LCNS_CRNT AS current_license
-JOIN  IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_NPI_CRNT enrollment_to_npi ON
-  enrollment_to_npi.prvdr_enrlmt_id =
-  current_license.prvdr_enrlmt_id
-JOIN IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_SPCLTY_CRNT AS enrollment_speciality ON 
-    enrollment_speciality.prvdr_enrlmt_id =
-    enrollment_to_npi.prvdr_enrlmt_id
-WHERE YEAR(PRVDR_ENRLMT_LCNS_EXPRTN_DT) > {last_year}
+    SELECT
+        PRVDR_NPI_NUM,
+        PRVDR_ENRLMT_LCNS_STATE_CD,
+        PRVDR_ENRLMT_LCNS_NUM, 
+        PRVDR_ENRLMT_FORM_CD,
+        PRVDR_ENRLMT_SPCLTY_CD,
+        PRVDR_ENRLMT_SPCLTY_DESC
+    FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_LCNS_CRNT AS current_license
+    JOIN  IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_NPI_CRNT enrollment_to_npi ON
+      enrollment_to_npi.prvdr_enrlmt_id =
+      current_license.prvdr_enrlmt_id
+    JOIN IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_SPCLTY_CRNT AS enrollment_speciality ON 
+        enrollment_speciality.prvdr_enrlmt_id =
+        enrollment_to_npi.prvdr_enrlmt_id
+    WHERE YEAR(PRVDR_ENRLMT_LCNS_EXPRTN_DT) > {last_year}
 )
 FILE_FORMAT = (
   TYPE = CSV
