@@ -206,6 +206,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-
-idr_data/**/*.csv
-vrdc_data/**/*.csv
+# The actual data should be downloaded safely to ~/cms_data_downloads_possible_pii so that we are not using .gitignore to protect against accidental pii release. 
+# But just in case.. we exclude csv files from these directories, as well as csv files generally
+*.csv
+idr_data_download_scripts/**/*.csv
+vrdc_data_download_scripts/**/*.csv
