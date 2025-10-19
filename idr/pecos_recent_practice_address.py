@@ -18,7 +18,7 @@ ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 pecos_recent_address_file_name = f"@~/pecos_recent_practice_address.{ts}.csv"
 
 pecos_recent_address_sql = f"""
-COPY INTO {address_file_name}
+COPY INTO {pecos_recent_address_file_name}
 FROM (
     SELECT 
         PRVDR_NPI_NUM,
