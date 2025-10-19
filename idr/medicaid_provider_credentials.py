@@ -1,4 +1,9 @@
 """
+==========
+Medicaid Provider Credential Export
+==========
+
+
 This script downloads Medicaid provider credential data, focusing on licenses and license numbers. It performs the following tasks:
 	•	Retrieves the list of licenses associated with each provider.
 	•	Extracts key fields including:
