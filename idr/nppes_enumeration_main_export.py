@@ -9,7 +9,7 @@ Current Demographics table export for IDR NPPES. Contains most of the main file 
 
 Methods applied to obscure covert pii into exportable data. 
 
-Uses the same salt as the tinhash etc. 
+Uses the same pepper as the tinhash etc. 
 
 is_export_pii is set to False for now. As NPPES replacement approaches we will need to change this decision
 
@@ -54,19 +54,19 @@ FROM (
                 {pii_comment_out} PRVDR_SSN_NUM, --pii
                 {pii_comment_out} PRVDR_TIN_NUM, --pii
                 {pii_comment_out} PRVDR_EIN_NUM, --possible pii
-                -- salt is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
+                -- pepper is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
                 
                 CASE WHEN PRVDR_SSN_NUM IS NOT NULL THEN 
-                    SHA2('{salt}' || PRVDR_SSN_NUM, 512)
-                ELSE NULL END AS PRVDR_SSN_NUM_salted_hash_sha512,
+                    SHA2('{pepper}' || PRVDR_SSN_NUM, 512)
+                ELSE NULL END AS PRVDR_SSN_NUM_peppered_hash_sha512,
 
                 CASE WHEN PRVDR_TIN_NUM IS NOT NULL THEN 
-                    SHA2('{salt}' || PRVDR_TIN_NUM, 512)
-                ELSE NULL END AS PRVDR_TIN_NUM_salted_hash_sha512,
+                    SHA2('{pepper}' || PRVDR_TIN_NUM, 512)
+                ELSE NULL END AS PRVDR_TIN_NUM_peppered_hash_sha512,
 
                 CASE WHEN PRVDR_EIN_NUM IS NOT NULL THEN 
-                    SHA2('{salt}' || PRVDR_EIN_NUM, 512)
-                ELSE NULL END AS PRVDR_EIN_NUM_salted_hash_sha512,
+                    SHA2('{pepper}' || PRVDR_EIN_NUM, 512)
+                ELSE NULL END AS PRVDR_EIN_NUM_peppered_hash_sha512,
 
                 PRVDR_ENMRTN_DT,
                 PRVDR_LAST_UPDT_DT,
@@ -92,8 +92,8 @@ FROM (
                 
 
                 CASE WHEN PRVDR_PRNT_ORG_TIN_NUM IS NOT NULL THEN 
-                    SHA2('{salt}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
-                ELSE NULL END AS PRVDR_PRNT_ORG_TIN_NUM_salted_hash_sha512,
+                    SHA2('{pepper}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
+                ELSE NULL END AS PRVDR_PRNT_ORG_TIN_NUM_peppered_hash_sha512,
 
                 {pii_comment_out} PRVDR_PRMRY_LANG_TXT, -- pii which is further greenlocked!!! 
 
