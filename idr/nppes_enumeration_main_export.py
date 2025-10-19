@@ -1,7 +1,7 @@
 
 """
 ==========
-MAIN IDR NPPES Export
+NPPES MAIN IDR Export
 ==========
 
 
@@ -41,10 +41,10 @@ else:
 nppes_IDR_main_export_filename = f"@~/medicaid_credentials.{pii_col_content}.{ts}.csv"
 
 nppes_IDR_main_export_sql = f"""
-COPY INTO {nppes_IDR_main_export_filename}""" + """
+COPY INTO {nppes_IDR_main_export_filename}""" + f"""
 FROM (
             SELECT
-                '{pii_col_content}' AS does_file_contain_pii
+                '{pii_col_content}' AS does_file_contain_pii,
                 PRVDR_NPI_NUM,
                 PRVDR_ENT_TYPE_CD,
                 PRVDR_ENT_TYPE_DESC,
@@ -79,11 +79,11 @@ FROM (
                 {pii_comment_out} PRVDR_BIRTH_USPS_STATE_CD, -- pii 
                 {pii_comment_out} PRVDR_BIRTH_CNTRY_CD, -- pii
                 {pii_comment_out} PRVDR_BIRTH_DT, -- pii
-                CONCAT(
-                        FLOOR(PRVDR_BIRTH_DT / 5) * 5,
-                            '-',
-                            FLOOR(PRVDR_BIRTH_DT / 5) * 5 + 4
-                ) AS PRVDR_BIRTH_DT_five_year_birth_span -- blurred indication of general provider age. 
+                CONCAT(  
+                            FLOOR(YEAR(PRVDR_BIRTH_DT) / 5) * 5,  
+                            '-',  
+                            FLOOR(YEAR(PRVDR_BIRTH_DT) / 5) * 5 + 4  
+                ) AS PRVDR_BIRTH_DT_five_year_birth_span, -- blurred indication of general provider age. 
 
                 PRVDR_SOLE_PRPRTR_CD,
 
@@ -94,7 +94,7 @@ FROM (
                 CASE WHEN PRVDR_PRNT_ORG_TIN_NUM IS NOT NULL THEN 
                     SHA2('{salt}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
                 ELSE NULL END AS PRVDR_PRNT_ORG_TIN_NUM_salted_hash_sha512,
-                
+
                 {pii_comment_out} PRVDR_PRMRY_LANG_TXT, -- pii which is further greenlocked!!! 
 
                 PRVDR_PREX_NAME,
