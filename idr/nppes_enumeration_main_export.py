@@ -53,16 +53,8 @@ FROM (
 
                 {pii_comment_out} PRVDR_SSN_NUM, --pii
                 {pii_comment_out} PRVDR_TIN_NUM, --pii
-                {pii_comment_out} PRVDR_EIN_NUM, --possible pii
+                PRVDR_EIN_NUM, 
                 -- pepper is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
-                
-                CASE WHEN PRVDR_SSN_NUM IS NOT NULL THEN 
-                    SHA2('{local_pepper}' || PRVDR_SSN_NUM, 512)
-                ELSE NULL END AS PRVDR_SSN_NUM_peppered_hash_sha512,
-
-                CASE WHEN PRVDR_TIN_NUM IS NOT NULL THEN 
-                    SHA2('{local_pepper}' || PRVDR_TIN_NUM, 512)
-                ELSE NULL END AS PRVDR_TIN_NUM_peppered_hash_sha512,
 
                 CASE WHEN PRVDR_EIN_NUM IS NOT NULL THEN 
                     SHA2('{local_pepper}' || PRVDR_EIN_NUM, 512)
@@ -88,7 +80,7 @@ FROM (
                 PRVDR_SOLE_PRPRTR_CD,
 
                 PRVDR_ORG_SUBRDNT_CD,
-                {pii_comment_out} PRVDR_PRNT_ORG_TIN_NUM, --possible pii
+                PRVDR_PRNT_ORG_TIN_NUM, --possible pii
                 
 
                 CASE WHEN PRVDR_PRNT_ORG_TIN_NUM IS NOT NULL THEN 
