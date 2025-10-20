@@ -10,15 +10,13 @@ in the initial implementation. This might lower all the way to CMS standard 11 b
 Also we are looking for the most common service locations in any case.. it is not obvious that 
 service locations which low patient volume have the same stability or usefulness. 
 
-TODO: The following NPI columns are found on the claim line table: 
+The following NPI columns are found on the claim line table: 
 
 * CLM_LINE_OPRTG_PRVDR_NPI_NUM
 * CLM_LINE_ORDRG_PRVDR_NPI_NUM
 
-Look at idr/medicaid_service_address_analysis.py for the right way to merge the addresses for 
-the claim line and claim. 
 
-This code needs to be updated to have two npi lists.. one for the claim and one for the claim line.
+This code needs to have two npi lists.. one for the claim and one for the claim line.
 The loop over the claim should not join to the claim line.. and should simply harvest the claim service 
 address directly. 
 
@@ -54,13 +52,19 @@ medicaid_service_locations_file_name = f"@~/medicaid_provider_service_locations.
 
 patient_aggregation_threshold = 20
 
-# Dictionary of NPI field types to process separately
-npi_fields = {
+# Dictionary of claim-level NPI fields to process separately
+claim_npi_fields = {
     'CLM_RX_DSPNSNG_PRVDR_NPI_NUM': 'rx_dispensing_provider',
     'CLM_SPRVSNG_PRVDR_NPI_NUM': 'supervising_provider', 
-    'CLM_SRVC_LCTN_ORG_NPI_NUM': 'service_location_org',
+    'CLM_SRVC_LCTN_ORG_NPI_NUM': 'service_location_org'
+}
+
+# Dictionary of claim-line level NPI fields to process separately  
+claim_line_npi_fields = {
     'CLM_LINE_SRVCNG_PRVDR_NPI_NUM': 'line_servicing_provider',
-    'CLM_LINE_SRVC_LCTN_ORG_NPI_NUM': 'line_service_location_org'
+    'CLM_LINE_SRVC_LCTN_ORG_NPI_NUM': 'line_service_location_org',
+    'CLM_LINE_OPRTG_PRVDR_NPI_NUM': 'line_operating_provider',
+    'CLM_LINE_ORDRG_PRVDR_NPI_NUM': 'line_ordering_provider'
 }
 
 # Step 1: Create temporary table to store combined NPI-address data
@@ -69,32 +73,134 @@ temp_table_name = f"TEMP_MEDICAID_NPI_ADDRESSES_{ts}"
 # Step 2: Build individual queries for each NPI type and UNION them
 union_queries = []
 
-for npi_field, npi_type in npi_fields.items():
+# Process claim-level NPIs (no join to claim line, use claim service address directly)
+for npi_field, npi_type in claim_npi_fields.items():
     individual_query = f"""
     SELECT 
         {npi_field} AS npi,
         '{npi_type}' AS npi_column_type,
-        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
-        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
-        CLM_LINE_SRVC_LCTN_CITY_NAME,
-        CLM_LINE_SRVC_LCTN_STATE_CD,
-        CLM_LINE_SRVC_LCTN_ZIP_CD,
-        COUNT(DISTINCT(CLM_MBI_NUM)) AS bene_count
+        CLM_SRVC_LCTN_LINE_1_ADR AS service_address_line_1,
+        CLM_SRVC_LCTN_LINE_2_ADR AS service_address_line_2,
+        CLM_SRVC_LCTN_CITY_NAME AS service_address_city,
+        CLM_SRVC_LCTN_STATE_CD AS service_address_state,
+        CLM_SRVC_LCTN_ZIP_CD AS service_address_zip,
+        COUNT(DISTINCT CLM_MBI_NUM) AS patient_count,
+        COUNT(DISTINCT CLM_UNIQ_ID) AS claim_count
     FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM AS CLM 
-    JOIN IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM_LINE AS CLINE ON 
-        CLINE.CLM_UNIQ_ID = CLM.CLM_UNIQ_ID  
     WHERE 
         YEAR(CLM.CLM_FROM_DT) = 2025
-        AND CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
-        AND CLM_LINE_SRVC_LCTN_CITY_NAME IS NOT NULL
+        AND CLM_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+        AND CLM_SRVC_LCTN_CITY_NAME IS NOT NULL
+        AND CLM_SRVC_LCTN_STATE_CD IS NOT NULL
+        AND CLM_SRVC_LCTN_ZIP_CD IS NOT NULL
         AND {npi_field} IS NOT NULL
     GROUP BY    
         {npi_field},
-        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
-        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
-        CLM_LINE_SRVC_LCTN_CITY_NAME,
-        CLM_LINE_SRVC_LCTN_STATE_CD,
-        CLM_LINE_SRVC_LCTN_ZIP_CD
+        CLM_SRVC_LCTN_LINE_1_ADR,
+        CLM_SRVC_LCTN_LINE_2_ADR,
+        CLM_SRVC_LCTN_CITY_NAME,
+        CLM_SRVC_LCTN_STATE_CD,
+        CLM_SRVC_LCTN_ZIP_CD
+    """
+    union_queries.append(individual_query)
+
+# Process claim-line NPIs (join back to main claim to get CLM_MBI_NUM, use CASE for address selection)
+for npi_field, npi_type in claim_line_npi_fields.items():
+    individual_query = f"""
+    SELECT 
+        CLINE.{npi_field} AS npi,
+        '{npi_type}' AS npi_column_type,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR 
+            ELSE CLM.CLM_SRVC_LCTN_LINE_1_ADR 
+        END AS service_address_line_1,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_LINE_2_ADR 
+            ELSE CLM.CLM_SRVC_LCTN_LINE_2_ADR 
+        END AS service_address_line_2,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_CITY_NAME 
+            ELSE CLM.CLM_SRVC_LCTN_CITY_NAME 
+        END AS service_address_city,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_STATE_CD 
+            ELSE CLM.CLM_SRVC_LCTN_STATE_CD 
+        END AS service_address_state,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD 
+            ELSE CLM.CLM_SRVC_LCTN_ZIP_CD 
+        END AS service_address_zip,
+        COUNT(DISTINCT CLM.CLM_MBI_NUM) AS patient_count,
+        COUNT(DISTINCT CLINE.CLM_UNIQ_ID) AS claim_count
+    FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM_LINE AS CLINE
+    JOIN IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM AS CLM ON 
+        CLINE.CLM_UNIQ_ID = CLM.CLM_UNIQ_ID  
+    WHERE 
+        YEAR(CLM.CLM_FROM_DT) = 2025
+        AND CLINE.{npi_field} IS NOT NULL
+        AND (
+            (CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_CITY_NAME IS NOT NULL
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL)
+            OR 
+            (CLM.CLM_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLM.CLM_SRVC_LCTN_CITY_NAME IS NOT NULL
+                AND CLM.CLM_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLM.CLM_SRVC_LCTN_ZIP_CD IS NOT NULL)
+        )
+    GROUP BY    
+        CLINE.{npi_field},
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR 
+            ELSE CLM.CLM_SRVC_LCTN_LINE_1_ADR 
+        END,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_LINE_2_ADR 
+            ELSE CLM.CLM_SRVC_LCTN_LINE_2_ADR 
+        END,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_CITY_NAME 
+            ELSE CLM.CLM_SRVC_LCTN_CITY_NAME 
+        END,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_STATE_CD 
+            ELSE CLM.CLM_SRVC_LCTN_STATE_CD 
+        END,
+        CASE 
+            WHEN CLINE.CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL 
+                AND CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL 
+            THEN CLINE.CLM_LINE_SRVC_LCTN_ZIP_CD 
+            ELSE CLM.CLM_SRVC_LCTN_ZIP_CD 
+        END
     """
     union_queries.append(individual_query)
 
@@ -113,23 +219,24 @@ medicaid_service_locations_sql = f"""
 COPY INTO {medicaid_service_locations_file_name}
 FROM (
     SELECT 
-        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
-        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
-        CLM_LINE_SRVC_LCTN_CITY_NAME,
-        CLM_LINE_SRVC_LCTN_STATE_CD,
-        CLM_LINE_SRVC_LCTN_ZIP_CD,
-        MAX(bene_count) AS minimum_distinct_patient_count,
+        service_address_line_1,
+        service_address_line_2,
+        service_address_city,
+        service_address_state,
+        service_address_zip,
+        MAX(patient_count) AS minimum_distinct_patient_count,
+        MIN(claim_count) AS minimum_distinct_claim_count,
         COUNT(*) AS npi_address_combinations,
         LISTAGG(DISTINCT npi_column_type, '; ') AS npi_types_present
     FROM {temp_table_name}
     GROUP BY    
-        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
-        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
-        CLM_LINE_SRVC_LCTN_CITY_NAME,
-        CLM_LINE_SRVC_LCTN_STATE_CD,
-        CLM_LINE_SRVC_LCTN_ZIP_CD
-    HAVING MAX(bene_count) >= {patient_aggregation_threshold}
-    ORDER BY minimum_distinct_patient_count DESC
+        service_address_line_1,
+        service_address_line_2,
+        service_address_city,
+        service_address_state,
+        service_address_zip
+    HAVING MAX(patient_count) >= {patient_aggregation_threshold}
+    ORDER BY minimum_distinct_patient_count DESC, minimum_distinct_claim_count DESC
 )""" + """
 FILE_FORMAT = (
   TYPE = CSV
