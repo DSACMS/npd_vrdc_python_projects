@@ -225,6 +225,7 @@ medicaid_service_locations_sql = f"""
 COPY INTO {medicaid_service_locations_file_name}
 FROM (
     SELECT 
+        npi,
         service_address_line_1,
         service_address_line_2,
         service_address_city,
@@ -236,6 +237,7 @@ FROM (
         LISTAGG(DISTINCT npi_column_type, '; ') AS npi_types_present
     FROM {temp_table_name}
     GROUP BY    
+        npi,
         service_address_line_1,
         service_address_line_2,
         service_address_city,
