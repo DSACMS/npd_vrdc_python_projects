@@ -43,7 +43,7 @@ FROM (
         CLM_LINE_SRVC_LCTN_CITY_NAME AS service_location_city_name,
         CLM_LINE_SRVC_LCTN_STATE_CD AS service_location_state_cd,
         CLM_LINE_SRVC_LCTN_ZIP_CD AS service_location_zip_cd,
-        COUNT(DISTINCT CLM_MBI_NUM) AS distinct_patient_count,
+        COUNT(DISTINCT CLM_UNIQ_ID) AS max_patient_count,
         COUNT(DISTINCT CLM_UNIQ_ID) AS distinct_claim_count,
         'ClaimLine' AS source_table
     FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM_LINE AS CLINE
@@ -64,7 +64,7 @@ FROM (
         CLM_SRVC_LCTN_CITY_NAME AS service_location_city_name,
         CLM_SRVC_LCTN_STATE_CD AS service_location_state_cd,
         CLM_SRVC_LCTN_ZIP_CD AS service_location_zip_cd,
-        COUNT(DISTINCT CLM_MBI_NUM) AS distinct_patient_count,
+        COUNT(DISTINCT CLM_MBI_NUM) AS max_patient_count,
         COUNT(DISTINCT CLM_UNIQ_ID) AS distinct_claim_count,
         'Claim' AS source_table
     FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM AS CLM
@@ -79,7 +79,7 @@ FROM (
         CLM_SRVC_LCTN_ZIP_CD
     
     ORDER BY 
-        distinct_patient_count DESC,
+        max_patient_count DESC,
         distinct_claim_count DESC
 )""" + """
 FILE_FORMAT = (
