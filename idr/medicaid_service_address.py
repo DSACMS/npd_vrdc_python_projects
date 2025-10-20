@@ -27,43 +27,84 @@ ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
 medicaid_service_locations_file_name = f"@~/medicaid_provider_service_locations.{ts}.csv"
 
-patient_aggregation_threshold = 50
+patient_aggregation_threshold = 20
 
+# Dictionary of NPI field types to process separately
+npi_fields = {
+    'CLM_RX_DSPNSNG_PRVDR_NPI_NUM': 'rx_dispensing_provider',
+    'CLM_SPRVSNG_PRVDR_NPI_NUM': 'supervising_provider', 
+    'CLM_SRVC_LCTN_ORG_NPI_NUM': 'service_location_org',
+    'CLM_LINE_SRVCNG_PRVDR_NPI_NUM': 'line_servicing_provider',
+    'CLM_LINE_SRVC_LCTN_ORG_NPI_NUM': 'line_service_location_org'
+}
+
+# Step 1: Create temporary table to store combined NPI-address data
+temp_table_name = f"TEMP_MEDICAID_NPI_ADDRESSES_{ts}"
+
+# Step 2: Build individual queries for each NPI type and UNION them
+union_queries = []
+
+for npi_field, npi_type in npi_fields.items():
+    individual_query = f"""
+    SELECT 
+        {npi_field} AS npi,
+        '{npi_type}' AS npi_column_type,
+        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
+        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
+        CLM_LINE_SRVC_LCTN_CITY_NAME,
+        CLM_LINE_SRVC_LCTN_STATE_CD,
+        CLM_LINE_SRVC_LCTN_ZIP_CD,
+        COUNT(DISTINCT(CLM_MBI_NUM)) AS bene_count
+    FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM AS CLM 
+    JOIN IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM_LINE AS CLINE ON 
+        CLINE.CLM_UNIQ_ID = CLM.CLM_UNIQ_ID  
+    WHERE 
+        YEAR(CLM.CLM_FROM_DT) = 2025
+        AND CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL 
+        AND CLM_LINE_SRVC_LCTN_CITY_NAME IS NOT NULL
+        AND {npi_field} IS NOT NULL
+    GROUP BY    
+        {npi_field},
+        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
+        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
+        CLM_LINE_SRVC_LCTN_CITY_NAME,
+        CLM_LINE_SRVC_LCTN_STATE_CD,
+        CLM_LINE_SRVC_LCTN_ZIP_CD
+    """
+    union_queries.append(individual_query)
+
+# Step 3: Create the temporary table with all NPI types combined
+create_temp_table_sql = f"""
+CREATE OR REPLACE TEMPORARY TABLE {temp_table_name} AS (
+    {' UNION ALL '.join(union_queries)}
+)
+"""
+
+print("Creating temporary NPI-address table...")
+session.sql(create_temp_table_sql).collect()
+
+# Step 4: Final aggregation query with MAX logic and export
 medicaid_service_locations_sql = f"""
 COPY INTO {medicaid_service_locations_file_name}
 FROM (
-	SELECT 
-		CLM_RX_DSPNSNG_PRVDR_NPI_NUM,
-		CLM_SPRVSNG_PRVDR_NPI_NUM,
-		CLM_SRVC_LCTN_ORG_NPI_NUM,
-		CLM_LINE_SRVCNG_PRVDR_NPI_NUM,
-		CLM_LINE_SRVC_LCTN_ORG_NPI_NUM,
-		CLM_LINE_SRVC_LCTN_LINE_1_ADR,
-		CLM_LINE_SRVC_LCTN_LINE_2_ADR,
-		CLM_LINE_SRVC_LCTN_CITY_NAME,
-		CLM_LINE_SRVC_LCTN_STATE_CD,
-		CLM_LINE_SRVC_LCTN_ZIP_CD,
-		COUNT(DISTINCT(CLM_MBI_NUM)) AS count_CLM_MBI_NUM
-	FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM AS CLM -- Provider data usually lives here.
-	JOIN IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM_LINE AS CLINE ON -- address data lives here..
-		CLINE.CLM_UNIQ_ID = CLM.CLM_UNIQ_ID  
-	WHERE 
-    	YEAR(CLM.CLM_FROM_DT) = 2025
-		AND CLM_LINE_SRVC_LCTN_LINE_1_ADR IS NOT NULL -- lots of times in this data structure there will be no address at all
-		AND CLM_LINE_SRVC_LCTN_CITY_NAME IS NOT NULL -- but if these two are set, then there tend not to be NULL values in the other address fields. 
-	GROUP BY    -- by all of the columns essentiall.
-		CLM_RX_DSPNSNG_PRVDR_NPI_NUM,
-		CLM_SPRVSNG_PRVDR_NPI_NUM,
-		CLM_SRVC_LCTN_ORG_NPI_NUM,
-		CLM_LINE_SRVCNG_PRVDR_NPI_NUM,
-		CLM_LINE_SRVC_LCTN_ORG_NPI_NUM,
-		CLM_LINE_SRVC_LCTN_LINE_1_ADR,
-		CLM_LINE_SRVC_LCTN_LINE_2_ADR,
-		CLM_LINE_SRVC_LCTN_CITY_NAME,
-		CLM_LINE_SRVC_LCTN_STATE_CD,
-		CLM_LINE_SRVC_LCTN_ZIP_CD
-	HAVING COUNT(DISTINCT(CLM_MBI_NUM)) > {patient_aggregation_threshold} -- a very high patient privacy threshold. This is the number of patients who must have been seen at this location to be in the data.
-
+    SELECT 
+        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
+        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
+        CLM_LINE_SRVC_LCTN_CITY_NAME,
+        CLM_LINE_SRVC_LCTN_STATE_CD,
+        CLM_LINE_SRVC_LCTN_ZIP_CD,
+        MAX(bene_count) AS minimum_distinct_patient_count,
+        COUNT(*) AS npi_address_combinations,
+        LISTAGG(DISTINCT npi_column_type, '; ') AS npi_types_present
+    FROM {temp_table_name}
+    GROUP BY    
+        CLM_LINE_SRVC_LCTN_LINE_1_ADR,
+        CLM_LINE_SRVC_LCTN_LINE_2_ADR,
+        CLM_LINE_SRVC_LCTN_CITY_NAME,
+        CLM_LINE_SRVC_LCTN_STATE_CD,
+        CLM_LINE_SRVC_LCTN_ZIP_CD
+    HAVING MAX(bene_count) >= {patient_aggregation_threshold}
+    ORDER BY minimum_distinct_patient_count DESC
 )""" + """
 FILE_FORMAT = (
   TYPE = CSV
@@ -75,8 +116,13 @@ HEADER = TRUE
 OVERWRITE = TRUE;
 """
 
+print("Exporting final aggregated results...")
 session.sql(medicaid_service_locations_sql).collect()
+
+# Clean up temporary table
+session.sql(f"DROP TABLE IF EXISTS {temp_table_name}").collect()
+print(f"Export completed to: {medicaid_service_locations_file_name}")
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
-# Or look in ../idr_data/ for idr_data/download_and_merge_all_snowflake_csv.sh which downloads the data from idr and then re-merges the csv files. 
+# Or look in ../idr_data/ for idr_data/download_and_merge_all_snowflake_csv.sh which downloads the data from idr and then re-merges the csv files.
