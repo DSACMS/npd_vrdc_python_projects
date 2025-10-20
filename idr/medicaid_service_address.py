@@ -10,6 +10,31 @@ in the initial implementation. This might lower all the way to CMS standard 11 b
 Also we are looking for the most common service locations in any case.. it is not obvious that 
 service locations which low patient volume have the same stability or usefulness. 
 
+TODO: The following NPI columns are found on the claim line table: 
+
+* CLM_LINE_OPRTG_PRVDR_NPI_NUM
+* CLM_LINE_ORDRG_PRVDR_NPI_NUM
+
+Look at idr/medicaid_service_address_analysis.py for the right way to merge the addresses for 
+the claim line and claim. 
+
+This code needs to be updated to have two npi lists.. one for the claim and one for the claim line.
+The loop over the claim should not join to the claim line.. and should simply harvest the claim service 
+address directly. 
+
+The code for the claim line should join back to the main claim table in order to get the CLM_MBI_NUM in order to patient counts.
+We would like to use COALESE to determine which address to take.. but sometimes the line2 of the claims line is null
+which would mean we would take everything from the claim line.. except take the line2 from the claim.. which is wrong. 
+
+So we will use a case statement that says: 
+
+if the line1, state and zip from the claim line are not null.. then take all of the columns from the claim line.
+Otherwise.. trust the claim level address. This case statement will need to be repeated for each address column. 
+
+Lets also do a count distinct on CLM_UNIQ_ID on both the claim line and the claim to get a claim count alongside the patient count. 
+use the same approach to get the "minimum" unique claim count.. despite our phased aggregation approach. 
+
+
 """
 
 # Note: you must have an appropriate role chosen and the IDRC_PRD_COMM_WH warehouse selected
