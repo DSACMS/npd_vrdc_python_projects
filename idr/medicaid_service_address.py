@@ -55,8 +55,14 @@ patient_aggregation_threshold = 20
 # Dictionary of claim-level NPI fields to process separately
 claim_npi_fields = {
     'CLM_RX_DSPNSNG_PRVDR_NPI_NUM': 'rx_dispensing_provider',
+    'CLM_PRSCRBNG_PRVDR_NPI_NUM': 'rx_prescribing_provider',
     'CLM_SPRVSNG_PRVDR_NPI_NUM': 'supervising_provider', 
-    'CLM_SRVC_LCTN_ORG_NPI_NUM': 'service_location_org'
+    'CLM_SRVC_LCTN_ORG_NPI_NUM': 'service_location_org',
+    'CLM_ADMTG_PRVDR_NPI_NUM': 'admitting_provider',
+    'CLM_BLG_PRVDR_NPI_NUM': 'billing_provider',
+    'CLM_HLTH_HOME_PRVDR_NPI_NUM': 'home_health_provider',
+    'CLM_ORDRG_PRVDR_NPI_NUM': 'ordering_provider'
+    
 }
 
 # Dictionary of claim-line level NPI fields to process separately  
