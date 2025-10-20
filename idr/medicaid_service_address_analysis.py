@@ -25,29 +25,17 @@ from datetime import datetime
 
 # We can also use Snowpark for our analyses!
 from snowflake.snowpark.context import get_active_session # type: ignore
+session = get_active_session()
 
-class MedicaidServiceAddressAnalysis:
-    """Analysis of Medicaid service location combinations without NPI consideration."""
-    
-    def __init__(self):
-        """Initialize the analysis with session and timestamp."""
-        self.session = get_active_session()
-        self.ts = datetime.now().strftime("%Y_%m_%d_%H%M")
-        self.output_file_name = f"@~/medicaid_service_location_analysis.{self.ts}.csv"
-        
-    @staticmethod
-    def _generate_analysis_query(*, file_name: str) -> str:
-        """
-        Generate SQL query for service location analysis.
-        
-        Args:
-            file_name: Output file name for the COPY INTO statement
-            
-        Returns:
-            Complete SQL query string
-        """
-        return f"""
-COPY INTO {file_name}
+ts = datetime.now().strftime("%Y_%m_%d_%H%M")
+
+medicaid_service_location_analysis_file_name = f"@~/medicaid_service_location_analysis.{ts}.csv"
+
+print("Starting Medicaid Service Location Analysis...")
+
+# Build the analysis query for service location combinations
+medicaid_service_location_analysis_sql = f"""
+COPY INTO {medicaid_service_location_analysis_file_name}
 FROM (
     SELECT 
         CLM_LINE_SRVC_LCTN_CITY_NAME,
@@ -70,7 +58,7 @@ FROM (
     ORDER BY 
         distinct_patient_count DESC,
         distinct_claim_count DESC
-)
+)""" + """
 FILE_FORMAT = (
   TYPE = CSV
   FIELD_DELIMITER = ','
@@ -81,29 +69,12 @@ HEADER = TRUE
 OVERWRITE = TRUE;
 """
 
-    @staticmethod
-    def run_analysis():
-        """Execute the complete service location analysis."""
-        print("Starting Medicaid Service Location Analysis...")
-        
-        # Create analysis instance
-        analysis = MedicaidServiceAddressAnalysis()
-        
-        # Generate and execute the analysis query
-        print("Executing service location analysis query...")
-        analysis_sql = analysis._generate_analysis_query(
-            file_name=analysis.output_file_name
-        )
-        
-        # Execute the query
-        analysis.session.sql(analysis_sql).collect()
-        
-        print(f"Analysis completed successfully!")
-        print(f"Export file: {analysis.output_file_name}")
-        print("To download use:")
-        print("snowsql -c cms_idr -q \"GET @~/ file://. PATTERN='.*.csv';\"")
-        print("Or look in ../idr_data/ for idr_data/download_and_merge_all_snowflake_csv.sh")
+print("Executing service location analysis query...")
+session.sql(medicaid_service_location_analysis_sql).collect()
 
-# Execute the analysis when run directly
-if __name__ == "__main__":
-    MedicaidServiceAddressAnalysis.run_analysis()
+print(f"Analysis completed successfully!")
+print(f"Export file: {medicaid_service_location_analysis_file_name}")
+
+# To download use: 
+# snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
+# Or look in ../idr_data/ for idr_data/download_and_merge_all_snowflake_csv.sh which downloads the data from idr and then re-merges the csv files.
