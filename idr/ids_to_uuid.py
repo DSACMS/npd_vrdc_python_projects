@@ -3,7 +3,7 @@ ids_to_uuid.py
 
 Deterministic UUID utilities for healthcare identifiers.
 
-We support two use-cases:
+We support three use-cases:
 
 1) NPI → UUIDv5 (public, reproducible)
    --------------------------------------------------
@@ -20,10 +20,15 @@ We support two use-cases:
    that this is a deterministic, name-style UUID — even though it is NOT the
    true uuid5 algorithm. The security comes from HMAC, not from the UUID version bit.
 
+3) Random UUIDv4 (completely random)
+   --------------------------------------------------
+   For cases where you need a completely random UUID with no deterministic mapping.
+   This is simply a wrapper around the standard uuid.uuid4() function.
+
 USAGE
 =====
 
-    from ids_to_uuid import npi_to_uuid5, ein_to_uuid_hmac, tin_to_uuid_hmac
+    from ids_to_uuid import npi_to_uuid5, ein_to_uuid_hmac, tin_to_uuid_hmac, get_random_uuid4
     import uuid
 
     # 1) NPI → UUIDv5 (no secret)
@@ -39,6 +44,10 @@ USAGE
     # scoping with "context" allows the same tin to map to different UUIDs if desired
     u3 = tin_to_uuid_hmac("987654321", pepper, context="CLAIMS")
     print(u3)
+
+    # 3) Random UUIDv4 (no input required)
+    u4 = get_random_uuid4()
+    print(u4)
 
 """
 
@@ -93,3 +102,18 @@ def tin_to_uuid_hmac(
 def ein_to_uuid_hmac(ein: str, pepper_key: Union[bytes, bytearray]) -> uuid.UUID:
     """Convenience wrapper explicitly marking context 'EIN'."""
     return tin_to_uuid_hmac(ein, pepper_key, context="EIN")
+
+# ------------------------------------------------------------------------------
+
+def get_random_uuid4() -> uuid.UUID:
+    """
+    Generate a random UUID version 4.
+    
+    This is simply a wrapper around uuid.uuid4() for consistency with the other
+    UUID generation functions in this module. UUIDv4 uses random or pseudo-random
+    numbers and provides no deterministic mapping from input data.
+    
+    Returns:
+        uuid.UUID: A random UUIDv4
+    """
+    return uuid.uuid4()
