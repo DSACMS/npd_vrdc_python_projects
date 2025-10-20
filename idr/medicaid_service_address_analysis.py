@@ -28,6 +28,7 @@ from snowflake.snowpark.context import get_active_session # type: ignore
 session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
+year = 2025
 
 medicaid_service_location_analysis_file_name = f"@~/medicaid_service_location_analysis.{ts}.csv"
 
@@ -37,17 +38,17 @@ print("Starting Medicaid Service Location Analysis...")
 medicaid_service_location_analysis_sql = f"""
 COPY INTO {medicaid_service_location_analysis_file_name}
 FROM (
+    -- Query ClaimLine table with original column names
     SELECT 
-        CLM_LINE_SRVC_LCTN_CITY_NAME,
-        CLM_LINE_SRVC_LCTN_STATE_CD,
-        CLM_LINE_SRVC_LCTN_ZIP_CD,
+        CLM_LINE_SRVC_LCTN_CITY_NAME AS service_location_city_name,
+        CLM_LINE_SRVC_LCTN_STATE_CD AS service_location_state_cd,
+        CLM_LINE_SRVC_LCTN_ZIP_CD AS service_location_zip_cd,
         COUNT(DISTINCT CLM_MBI_NUM) AS distinct_patient_count,
-        COUNT(DISTINCT CLM.CLM_UNIQ_ID) AS distinct_claim_count
-    FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM AS CLM 
-    JOIN IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM_LINE AS CLINE ON 
-        CLINE.CLM_UNIQ_ID = CLM.CLM_UNIQ_ID  
+        COUNT(DISTINCT CLM_UNIQ_ID) AS distinct_claim_count,
+        'ClaimLine' AS source_table
+    FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM_LINE AS CLINE
     WHERE 
-        YEAR(CLM.CLM_FROM_DT) = 2025
+        YEAR(CLM_FROM_DT) = {year}
         AND CLM_LINE_SRVC_LCTN_CITY_NAME IS NOT NULL
         AND CLM_LINE_SRVC_LCTN_STATE_CD IS NOT NULL
         AND CLM_LINE_SRVC_LCTN_ZIP_CD IS NOT NULL
@@ -55,6 +56,28 @@ FROM (
         CLM_LINE_SRVC_LCTN_CITY_NAME,
         CLM_LINE_SRVC_LCTN_STATE_CD,
         CLM_LINE_SRVC_LCTN_ZIP_CD
+    
+    UNION ALL
+    
+    -- Query Claim table with modified column names (remove "_LINE_")
+    SELECT 
+        CLM_SRVC_LCTN_CITY_NAME AS service_location_city_name,
+        CLM_SRVC_LCTN_STATE_CD AS service_location_state_cd,
+        CLM_SRVC_LCTN_ZIP_CD AS service_location_zip_cd,
+        COUNT(DISTINCT CLM_MBI_NUM) AS distinct_patient_count,
+        COUNT(DISTINCT CLM_UNIQ_ID) AS distinct_claim_count,
+        'Claim' AS source_table
+    FROM IDRC_PRD.CMS_VDM_VIEW_MDCD_PRD.V2_MDCD_CLM AS CLM
+    WHERE 
+        YEAR(CLM_FROM_DT) = {year}
+        AND CLM_SRVC_LCTN_CITY_NAME IS NOT NULL
+        AND CLM_SRVC_LCTN_STATE_CD IS NOT NULL
+        AND CLM_SRVC_LCTN_ZIP_CD IS NOT NULL
+    GROUP BY    
+        CLM_SRVC_LCTN_CITY_NAME,
+        CLM_SRVC_LCTN_STATE_CD,
+        CLM_SRVC_LCTN_ZIP_CD
+    
     ORDER BY 
         distinct_patient_count DESC,
         distinct_claim_count DESC
