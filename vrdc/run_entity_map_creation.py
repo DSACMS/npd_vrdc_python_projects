@@ -11,7 +11,8 @@ Usage:
 """
 
 from CreateEntityMap import VRDCEntityMapBuilder
-from entity_looper import MonthRange, VRDCEntityMapper
+from MonthRange import MonthRange
+from VrdcEntityMapper import VRDCEntityMapper
 
 # Configuration Variables - Modify these for your environment
 extracts_catalog = 'extracts'

@@ -6,7 +6,8 @@ to generate entity maps from VRDC claims data.
 """
 
 from CreateEntityMap import VRDCEntityMapBuilder
-from entity_looper import VRDCEntityMapper
+from MonthRange import MonthRange
+from VrdcEntityMapper import VRDCEntityMapper
 
 def demonstrate_entity_map_creation():
     """Demonstrate various ways to use the VRDCEntityMapBuilder."""
@@ -18,7 +19,6 @@ def demonstrate_entity_map_creation():
     print("\n1. Small Time Range Example (Q1 2023, 3 settings)")
     print("-" * 50)
     
-    from entity_looper import MonthRange
     q1_2023_range = MonthRange(start_year=2023, start_month=1, end_year=2023, end_month=3)
     
     sql_q1 = VRDCEntityMapBuilder.build_entity_map(

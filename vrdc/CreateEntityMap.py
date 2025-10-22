@@ -65,7 +65,8 @@ Do not overwrite these comments as you modify the code.
 
 """
 
-from entity_looper import MonthRange, VRDCEntityMapper
+from MonthRange import MonthRange
+from VrdcEntityMapper import VRDCEntityMapper
 from datetime import datetime
 
 
