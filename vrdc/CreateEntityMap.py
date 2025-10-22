@@ -119,7 +119,7 @@ class VRDCEntityMapBuilder:
         # 1. Drop view if exists
         sql['DROP entity map view'] = f"DROP VIEW IF EXISTS {entity_view_full}"
         
-        # 2. Create view with union of monthly data
+        # 2. Create view with union of monthly data - one SELECT per NPI field
         union_queries = []
         
         for result in VRDCEntityMapper.iterate_month_range(
@@ -129,26 +129,81 @@ class VRDCEntityMapBuilder:
             claim_table = f"{extracts_catalog}.{result['database']}.{result['claim_table']}"
             line_table = f"{extracts_catalog}.{result['database']}.{result['line_table']}"
             
-            # Generate entity fields with simplified aliases
-            entity_sql = VRDCEntityMapper.get_sql_select_list(
-                setting=result['setting'], simplified_npi_aliases=True
-            )
+            setting = result['setting']
+            year = result['year']
+            month = result['month']
             
-            # Build monthly query
-            monthly_query = f"""
-        SELECT 
-            '{result['setting']}' AS source_setting_name,
+            # Generate separate SELECT for each organizational NPI field
+            for npi_field_info in VRDCEntityMapper.iterate_npi_fields(setting=setting, npi_level='organizational_npi'):
+                table_ref = "CLAIM" if npi_field_info['table'] == 'CLAIM' else "CLINE"
+                table_name = claim_table if npi_field_info['table'] == 'CLAIM' else line_table
+                npi_where_field = f"{table_ref}.{npi_field_info['field']}"
+                
+                # Get TAX_NUM and CCN for this setting
+                setting_fields = VRDCEntityMapper.get_setting_fields(setting=setting)
+                tax_num_sql = "NULL AS TAX_NUM"
+                ccn_sql = "NULL AS CCN"
+                
+                if setting_fields['tax_id']:
+                    tax_field = setting_fields['tax_id'][0]
+                    tax_table_ref = "CLAIM" if tax_field['table'] == 'CLAIM' else "CLINE"
+                    tax_num_sql = f"{tax_table_ref}.{tax_field['field']} AS TAX_NUM"
+                
+                if setting_fields['ccn']:
+                    ccn_field = setting_fields['ccn'][0]
+                    ccn_table_ref = "CLAIM" if ccn_field['table'] == 'CLAIM' else "CLINE" 
+                    ccn_sql = f"{ccn_table_ref}.{ccn_field['field']} AS CCN"
+                
+                monthly_query = f"""        SELECT 
+            '{setting}' AS source_setting_name,
             CLAIM.BENE_ID AS bene_id,
             CLAIM.CLM_ID AS clm_id,
-            {entity_sql}
+            {tax_num_sql},
+            {ccn_sql},
+            {table_ref}.{npi_field_info['field']} AS onpi,
+            NULL AS pnpi
         FROM {claim_table} AS CLAIM
         LEFT JOIN {line_table} AS CLINE
             ON CLAIM.CLM_ID = CLINE.CLM_ID
-        WHERE (CLAIM.TAX_NUM IS NOT NULL 
-            OR CLAIM.PRVDR_NUM IS NOT NULL 
-            OR CLAIM.BENE_ID IS NOT NULL)"""
+        WHERE {npi_where_field} IS NOT NULL"""
+                
+                union_queries.append(monthly_query)
             
-            union_queries.append(monthly_query)
+            # Generate separate SELECT for each personal NPI field
+            for npi_field_info in VRDCEntityMapper.iterate_npi_fields(setting=setting, npi_level='personal_npi'):
+                table_ref = "CLAIM" if npi_field_info['table'] == 'CLAIM' else "CLINE"
+                table_name = claim_table if npi_field_info['table'] == 'CLAIM' else line_table
+                npi_where_field = f"{table_ref}.{npi_field_info['field']}"
+                
+                # Get TAX_NUM and CCN for this setting
+                setting_fields = VRDCEntityMapper.get_setting_fields(setting=setting)
+                tax_num_sql = "NULL AS TAX_NUM"
+                ccn_sql = "NULL AS CCN"
+                
+                if setting_fields['tax_id']:
+                    tax_field = setting_fields['tax_id'][0]
+                    tax_table_ref = "CLAIM" if tax_field['table'] == 'CLAIM' else "CLINE"
+                    tax_num_sql = f"{tax_table_ref}.{tax_field['field']} AS TAX_NUM"
+                
+                if setting_fields['ccn']:
+                    ccn_field = setting_fields['ccn'][0]
+                    ccn_table_ref = "CLAIM" if ccn_field['table'] == 'CLAIM' else "CLINE"
+                    ccn_sql = f"{ccn_table_ref}.{ccn_field['field']} AS CCN"
+                
+                monthly_query = f"""        SELECT 
+            '{setting}' AS source_setting_name,
+            CLAIM.BENE_ID AS bene_id,
+            CLAIM.CLM_ID AS clm_id,
+            {tax_num_sql},
+            {ccn_sql},
+            NULL AS onpi,
+            {table_ref}.{npi_field_info['field']} AS pnpi
+        FROM {claim_table} AS CLAIM
+        LEFT JOIN {line_table} AS CLINE
+            ON CLAIM.CLM_ID = CLINE.CLM_ID
+        WHERE {npi_where_field} IS NOT NULL"""
+                
+                union_queries.append(monthly_query)
         
         # Combine with UNION ALL
         view_query = "\nUNION ALL\n".join(union_queries)

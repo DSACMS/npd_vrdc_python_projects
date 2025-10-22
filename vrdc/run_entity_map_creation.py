@@ -31,10 +31,11 @@ cms_privacy_threshold = 10
 analysis_start_year = 2023
 analysis_start_month = 1
 analysis_end_year = 2023
-analysis_end_month = 12
+analysis_end_month = 2
 
 # Settings to include (leave empty list for all settings)
-include_settings = []  # ['bcarrier', 'dme', 'inpatient'] or [] for all
+# include_settings = []  # All settings
+include_settings = ['bcarrier', 'inpatient']  # Uncomment to test specific settings
 
 # Execution control
 is_just_print = True  # Set to True to print SQL without executing

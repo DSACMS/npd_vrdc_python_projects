@@ -16,31 +16,41 @@ def demonstrate_entity_map_creation():
     print("=" * 70)
     
     # Example 1: Small time range with specific settings
-    print("\n1. Small Time Range Example (Q1 2023, 3 settings)")
-    print("-" * 50)
+    print("\n1. Columnarized Entity Structure Example (January 2023, bcarrier only)")
+    print("-" * 70)
     
-    q1_2023_range = MonthRange(start_year=2023, start_month=1, end_year=2023, end_month=3)
+    jan_2023_range = MonthRange(start_year=2023, start_month=1, end_year=2023, end_month=1)
     
-    sql_q1 = VRDCEntityMapBuilder.build_entity_map(
-        month_range=q1_2023_range,
-        settings=['bcarrier', 'dme', 'inpatient'],
-        output_database='my_analysis_db',
-        view_name='q1_2023_entity_view',
-        table_name='q1_2023_entity_map',
+    sql_jan = VRDCEntityMapBuilder.build_entity_map(
+        month_range=jan_2023_range,
+        settings=['bcarrier'],
+        output_database='demo_db',
+        view_name='jan_2023_entity_view',
+        table_name='jan_2023_entity_map',
         execute=False  # Just generate SQL
     )
     
-    print(f"Generated {len(sql_q1)} SQL statements")
-    print("View would union 9 monthly queries (3 months × 3 settings)")
+    view_sql = sql_jan['CREATE entity map view']
+    union_count = view_sql.count('UNION ALL')
+    select_count = view_sql.count('SELECT')
     
-    # Show the structure of one monthly query
-    view_sql = sql_q1['CREATE entity map view']
-    first_select = view_sql.split('UNION ALL')[0]
-    lines = first_select.strip().split('\n')
-    print("\nSample monthly query structure:")
-    for i, line in enumerate(lines[:8]):
-        print(f"  {line}")
-    print("  ... [additional fields]")
+    print(f"Generated {select_count} individual SELECT statements")
+    print(f"Combined with {union_count} UNION ALL operations")
+    print("CRITICAL: Each SELECT has exactly ONE NPI field (onpi OR pnpi, never both)")
+    
+    # Show structure of first few SELECT statements
+    parts = view_sql.split('UNION ALL')
+    print(f"\nFirst 3 SELECT statements:")
+    for i, part in enumerate(parts[:3]):
+        lines = part.strip().split('\n')
+        print(f"\n--- SELECT {i+1} ---")
+        for line in lines[:10]:
+            if line.strip():
+                print(f"  {line.strip()}")
+                if 'AS onpi' in line or 'AS pnpi' in line:
+                    npi_type = 'organizational' if 'AS onpi' in line else 'personal'
+                    print(f"    --> Individual {npi_type} NPI field!")
+                    break
     
     # Example 2: Full year with all settings
     print("\n\n2. Full Year Example (2023, all settings)")
