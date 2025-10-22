@@ -19,7 +19,10 @@ proper database and table naming conventions:
 - Revenue table format: {setting}_revenue_{month:02d} for institutional settings
 """
 
-from MonthRange import MonthRange
+try:
+    from .MonthRange import MonthRange
+except ImportError:
+    from MonthRange import MonthRange
 
 
 class VRDCEntityMapper:

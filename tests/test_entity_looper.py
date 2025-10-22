@@ -6,7 +6,8 @@ ensuring proper field mappings, database/table naming, and time range iteration.
 """
 
 import pytest
-from vrdc.entity_looper import MonthRange, VRDCEntityMapper
+from vrdc.MonthRange import MonthRange
+from vrdc.VrdcEntityMapper import VRDCEntityMapper
 
 
 class TestMonthRange:

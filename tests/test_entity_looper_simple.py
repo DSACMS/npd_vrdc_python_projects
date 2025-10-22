@@ -9,7 +9,8 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from vrdc.entity_looper import MonthRange, VRDCEntityMapper
+from vrdc.MonthRange import MonthRange
+from vrdc.VrdcEntityMapper import VRDCEntityMapper
 
 
 def test_month_range_basic():

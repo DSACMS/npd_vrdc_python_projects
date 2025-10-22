@@ -65,8 +65,12 @@ Do not overwrite these comments as you modify the code.
 
 """
 
-from MonthRange import MonthRange
-from VrdcEntityMapper import VRDCEntityMapper
+try:
+    from .MonthRange import MonthRange
+    from .VrdcEntityMapper import VRDCEntityMapper
+except ImportError:
+    from MonthRange import MonthRange
+    from VrdcEntityMapper import VRDCEntityMapper
 from datetime import datetime
 
 
