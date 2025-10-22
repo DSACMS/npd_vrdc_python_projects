@@ -22,7 +22,7 @@ session = get_active_session()
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
 
-nppes_IDR_main_export_filename = f"@~/pecos_organization_export.{pii_col_content}.{ts}.csv"
+nppes_IDR_main_export_filename = f"@~/pecos_organization_export.{ts}.csv"
 
 nppes_IDR_main_export_sql = f"""
 COPY INTO {nppes_IDR_main_export_filename}""" + f"""
@@ -30,7 +30,8 @@ FROM (
 SELECT 
     PRVDR_PAC_ID,    
     PRVDR_ENRLMT_TIN_NUM,
-    PRVDR_ENRLMT_ID,
+    PRVDR_NPI_NUM,
+    ENRLMT.PRVDR_ENRLMT_ID,
     PRVDR_ENRLMT_LGL_BUSNS_NAME,
     PRVDR_ENRLMT_TIN_TYPE_CD,
     PRVDR_ENRLMT_MLG_LINE_1_ADR,
@@ -40,7 +41,10 @@ SELECT
     PRVDR_ENRLMT_PHNE_NUM,
     PRVDR_ENRLMT_FAX_NUM,
     PRVDR_ENRLMT_EMAIL_ADR
-FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_MDCR_PRVDR_ENRLMT
+FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_MDCR_PRVDR_ENRLMT AS ENRLMT
+JOIN IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENRLMT_NPI_CRNT AS NPI_ENRLMT ON 
+    NPI_ENRLMT.PRVDR_ENRLMT_ID =
+    ENRLMT.PRVDR_ENRLMT_ID
 WHERE PRVDR_ENRLMT_TIN_NUM IS NOT NULL AND PRVDR_ENRLMT_TIN_NUM != '~'
 )""" + """
 FILE_FORMAT = (
