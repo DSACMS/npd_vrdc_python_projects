@@ -28,14 +28,14 @@ entity_log_table_name = 'vrdc_entity_map_log'
 cms_privacy_threshold = 10
 
 # Time Range Configuration (modify these)
-analysis_start_year = 2023
+analysis_start_year = 2025
 analysis_start_month = 1
-analysis_end_year = 2023
-analysis_end_month = 2
+analysis_end_year = 2025
+analysis_end_month = 8
 
 # Settings to include (leave empty list for all settings)
-# include_settings = []  # All settings
-include_settings = ['bcarrier', 'inpatient']  # Uncomment to test specific settings
+include_settings = []  # All settings
+# include_settings = ['bcarrier', 'inpatient']  # Uncomment to test specific settings
 
 # Execution control
 is_just_print = True  # Set to True to print SQL without executing

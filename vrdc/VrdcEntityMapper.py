@@ -96,7 +96,7 @@ class VRDCEntityMapper:
                 {'table': 'CLINE', 'field': 'TAX_NUM', 'alias': 'TAX_NUM'}
             ],
             'ccn': [
-                {'table': 'CLAIM', 'field': 'PRVDR_NUM', 'alias': 'PRVDR_NUM'}
+                {'table': 'CLINE', 'field': 'PRVDR_NUM', 'alias': 'PRVDR_NUM'}
             ],
             'organizational_npi': [
                 {'table': 'CLINE', 'field': 'PRVDR_NPI', 'alias': 'PRVDR_NPI'}
