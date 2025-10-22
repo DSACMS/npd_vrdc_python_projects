@@ -128,11 +128,11 @@ class VRDCEntityMapper:
             ]
         }
         
-        # inpatient - full institutional format
+        # inpatient - institutional format without SRVC_LOC_NPI_NUM and ORDRG_PHYSN_NPI
         mappings['inpatient'] = {
             'tax_id': institutional_base['tax_id'][:],
             'ccn': institutional_base['ccn'][:],
-            'organizational_npi': institutional_base['organizational_npi'][:],
+            'organizational_npi': [field for field in institutional_base['organizational_npi'] if field['field'] != 'SRVC_LOC_NPI_NUM'],  # not found in Inpatient
             'personal_npi': [field for field in institutional_base['personal_npi'] if field['field'] != 'ORDRG_PHYSN_NPI']  # not found in Inpatient
         }
         
