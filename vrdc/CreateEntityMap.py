@@ -1,5 +1,7 @@
 """
-This class leverages the EntityLooper to create the entity map from a time period in VRDC claims files. 
+CreateEntityMap.py
+
+Leverages the EntityLooper to create the entity map from a time period in VRDC claims files. 
 
 First, it creates a VIEW that contains a row in the data with five columns for each month of claim + claim_line data. 
 These are: 
