@@ -107,6 +107,29 @@ class VRDCEntityMapper:
         self._data = self._build_entity_mappings()
     
     @staticmethod
+    def _generate_sql_string(*, table, field, alias, simplified_npi_aliases=False, level=None):
+        """
+        Generate SQL string from table, field, and alias.
+        
+        Args:
+            table (str): Table name (CLAIM or CLINE)
+            field (str): Field name
+            alias (str): Alias name
+            simplified_npi_aliases (bool): If True, use simplified aliases for NPI fields
+            level (str): Entity level (for simplified aliasing)
+            
+        Returns:
+            str: SQL string in format "table.field AS alias"
+        """
+        if simplified_npi_aliases and level:
+            if level == 'organizational_npi':
+                return f"{table}.{field} AS onpi"
+            elif level == 'personal_npi':
+                return f"{table}.{field} AS pnpi"
+        
+        return f"{table}.{field} AS {alias}"
+    
+    @staticmethod
     def _build_entity_mappings():
         """
         Build the complete entity mapping data structure.
@@ -119,58 +142,58 @@ class VRDCEntityMapper:
         # bcarrier settings
         mappings['bcarrier'] = {
             'tax_id': [
-                {'table': 'CLAIM', 'field': 'TAX_NUM', 'alias': 'TAX_NUM', 'sql': 'CLAIM.TAX_NUM AS TAX_NUM'}
+                {'table': 'CLAIM', 'field': 'TAX_NUM', 'alias': 'TAX_NUM'}
             ],
             'ccn': [],  # No CCN for bcarrier
             'organizational_npi': [
-                {'table': 'CLAIM', 'field': 'CARR_CLM_BLG_NPI_NUM', 'alias': 'CARR_CLM_BLG_NPI_NUM', 'sql': 'CLAIM.CARR_CLM_BLG_NPI_NUM AS CARR_CLM_BLG_NPI_NUM'},
-                {'table': 'CLAIM', 'field': 'CPO_ORG_NPI_NUM', 'alias': 'CPO_ORG_NPI_NUM', 'sql': 'CLAIM.CPO_ORG_NPI_NUM AS CPO_ORG_NPI_NUM'},
-                {'table': 'CLAIM', 'field': 'CARR_CLM_SOS_NPI_NUM', 'alias': 'CARR_CLM_SOS_NPI_NUM', 'sql': 'CLAIM.CARR_CLM_SOS_NPI_NUM AS CARR_CLM_SOS_NPI_NUM'},
-                {'table': 'CLINE', 'field': 'CARR_LINE_MDPP_NPI_NUM', 'alias': 'CARR_LINE_MDPP_NPI_NUM', 'sql': 'CLINE.CARR_LINE_MDPP_NPI_NUM AS CARR_LINE_MDPP_NPI_NUM'},
-                {'table': 'CLINE', 'field': 'ORG_NPI_NUM', 'alias': 'ORG_NPI_NUM', 'sql': 'CLINE.ORG_NPI_NUM AS ORG_NPI_NUM'}
+                {'table': 'CLAIM', 'field': 'CARR_CLM_BLG_NPI_NUM', 'alias': 'CARR_CLM_BLG_NPI_NUM'},
+                {'table': 'CLAIM', 'field': 'CPO_ORG_NPI_NUM', 'alias': 'CPO_ORG_NPI_NUM'},
+                {'table': 'CLAIM', 'field': 'CARR_CLM_SOS_NPI_NUM', 'alias': 'CARR_CLM_SOS_NPI_NUM'},
+                {'table': 'CLINE', 'field': 'CARR_LINE_MDPP_NPI_NUM', 'alias': 'CARR_LINE_MDPP_NPI_NUM'},
+                {'table': 'CLINE', 'field': 'ORG_NPI_NUM', 'alias': 'ORG_NPI_NUM'}
             ],
             'personal_npi': [
-                {'table': 'CLAIM', 'field': 'PRF_PHYSN_NPI', 'alias': 'PRF_PHYSN_NPI', 'sql': 'CLAIM.PRF_PHYSN_NPI AS PRF_PHYSN_NPI'},
-                {'table': 'CLAIM', 'field': 'CARR_LINE_MDPP_NPI_NUM', 'alias': 'CARR_LINE_MDPP_NPI_NUM', 'sql': 'CLAIM.CARR_LINE_MDPP_NPI_NUM AS CARR_LINE_MDPP_NPI_NUM'},
-                {'table': 'CLINE', 'field': 'PRF_PHYSN_NPI', 'alias': 'PRF_PHYSN_NPI', 'sql': 'CLINE.PRF_PHYSN_NPI AS PRF_PHYSN_NPI'}
+                {'table': 'CLAIM', 'field': 'PRF_PHYSN_NPI', 'alias': 'PRF_PHYSN_NPI'},
+                {'table': 'CLAIM', 'field': 'CARR_LINE_MDPP_NPI_NUM', 'alias': 'CARR_LINE_MDPP_NPI_NUM'},
+                {'table': 'CLINE', 'field': 'PRF_PHYSN_NPI', 'alias': 'PRF_PHYSN_NPI'}
             ]
         }
         
         # dme settings
         mappings['dme'] = {
             'tax_id': [
-                {'table': 'CLAIM', 'field': 'TAX_NUM', 'alias': 'TAX_NUM', 'sql': 'CLAIM.TAX_NUM AS TAX_NUM'}
+                {'table': 'CLAIM', 'field': 'TAX_NUM', 'alias': 'TAX_NUM'}
             ],
             'ccn': [
-                {'table': 'CLAIM', 'field': 'PRVDR_NUM', 'alias': 'PRVDR_NUM', 'sql': 'CLAIM.PRVDR_NUM AS PRVDR_NUM'}
+                {'table': 'CLAIM', 'field': 'PRVDR_NUM', 'alias': 'PRVDR_NUM'}
             ],
             'organizational_npi': [
-                {'table': 'CLINE', 'field': 'PRVDR_NPI', 'alias': 'PRVDR_NPI', 'sql': 'CLINE.PRVDR_NPI AS PRVDR_NPI'}
+                {'table': 'CLINE', 'field': 'PRVDR_NPI', 'alias': 'PRVDR_NPI'}
             ],
             'personal_npi': [
-                {'table': 'CLAIM', 'field': 'RFR_PHYSN_NPI', 'alias': 'RFR_PHYSN_NPI', 'sql': 'CLAIM.RFR_PHYSN_NPI AS RFR_PHYSN_NPI'}
+                {'table': 'CLAIM', 'field': 'RFR_PHYSN_NPI', 'alias': 'RFR_PHYSN_NPI'}
             ]
         }
         
         # Institutional formats - build base template
         institutional_base = {
             'tax_id': [
-                {'table': 'CLAIM', 'field': 'OWNG_PRVDR_TIN_NUM', 'alias': 'OWNG_PRVDR_TIN_NUM', 'sql': 'CLAIM.OWNG_PRVDR_TIN_NUM AS OWNG_PRVDR_TIN_NUM'}
+                {'table': 'CLAIM', 'field': 'OWNG_PRVDR_TIN_NUM', 'alias': 'OWNG_PRVDR_TIN_NUM'}
             ],
             'ccn': [
-                {'table': 'CLAIM', 'field': 'PRVDR_NUM', 'alias': 'PRVDR_NUM', 'sql': 'CLAIM.PRVDR_NUM AS PRVDR_NUM'}
+                {'table': 'CLAIM', 'field': 'PRVDR_NUM', 'alias': 'PRVDR_NUM'}
             ],
             'organizational_npi': [
-                {'table': 'CLAIM', 'field': 'ORG_NPI_NUM', 'alias': 'ORG_NPI_NUM', 'sql': 'CLAIM.ORG_NPI_NUM AS ORG_NPI_NUM'},
-                {'table': 'CLAIM', 'field': 'SRVC_LOC_NPI_NUM', 'alias': 'SRVC_LOC_NPI_NUM', 'sql': 'CLAIM.SRVC_LOC_NPI_NUM AS SRVC_LOC_NPI_NUM'}
+                {'table': 'CLAIM', 'field': 'ORG_NPI_NUM', 'alias': 'ORG_NPI_NUM'},
+                {'table': 'CLAIM', 'field': 'SRVC_LOC_NPI_NUM', 'alias': 'SRVC_LOC_NPI_NUM'}
             ],
             'personal_npi': [
-                {'table': 'CLAIM', 'field': 'AT_PHYSN_NPI', 'alias': 'AT_PHYSN_NPI', 'sql': 'CLAIM.AT_PHYSN_NPI AS AT_PHYSN_NPI'},
-                {'table': 'CLAIM', 'field': 'OP_PHYSN_NPI', 'alias': 'OP_PHYSN_NPI', 'sql': 'CLAIM.OP_PHYSN_NPI AS OP_PHYSN_NPI'},
-                {'table': 'CLAIM', 'field': 'OT_PHYSN_NPI', 'alias': 'OT_PHYSN_NPI', 'sql': 'CLAIM.OT_PHYSN_NPI AS OT_PHYSN_NPI'},
-                {'table': 'CLAIM', 'field': 'RNDRNG_PHYSN_NPI', 'alias': 'claim_RNDRNG_PHYSN_NPI', 'sql': 'CLAIM.RNDRNG_PHYSN_NPI AS claim_RNDRNG_PHYSN_NPI'},
-                {'table': 'CLINE', 'field': 'RNDRNG_PHYSN_NPI', 'alias': 'cline_RNDRNG_PHYSN_NPI', 'sql': 'CLINE.RNDRNG_PHYSN_NPI AS cline_RNDRNG_PHYSN_NPI'},
-                {'table': 'CLINE', 'field': 'ORDRG_PHYSN_NPI', 'alias': 'ORDRG_PHYSN_NPI', 'sql': 'CLINE.ORDRG_PHYSN_NPI AS ORDRG_PHYSN_NPI'}
+                {'table': 'CLAIM', 'field': 'AT_PHYSN_NPI', 'alias': 'AT_PHYSN_NPI'},
+                {'table': 'CLAIM', 'field': 'OP_PHYSN_NPI', 'alias': 'OP_PHYSN_NPI'},
+                {'table': 'CLAIM', 'field': 'OT_PHYSN_NPI', 'alias': 'OT_PHYSN_NPI'},
+                {'table': 'CLAIM', 'field': 'RNDRNG_PHYSN_NPI', 'alias': 'claim_RNDRNG_PHYSN_NPI'},
+                {'table': 'CLINE', 'field': 'RNDRNG_PHYSN_NPI', 'alias': 'cline_RNDRNG_PHYSN_NPI'},
+                {'table': 'CLINE', 'field': 'ORDRG_PHYSN_NPI', 'alias': 'ORDRG_PHYSN_NPI'}
             ]
         }
         
@@ -266,12 +289,13 @@ class VRDCEntityMapper:
         return result
     
     @staticmethod
-    def get_sql_select_list(*, setting):
+    def get_sql_select_list(*, setting, simplified_npi_aliases=False):
         """
         Get comma-separated SQL select list for a specific setting.
         
         Args:
             setting (str): Benefit setting name
+            simplified_npi_aliases (bool): If True, use 'onpi' and 'pnpi' for NPI fields
             
         Returns:
             str: Comma-separated SQL select statement
@@ -281,7 +305,14 @@ class VRDCEntityMapper:
         sql_parts = []
         for level_name, field_list in setting_fields.items():
             for field_mapping in field_list:
-                sql_parts.append(field_mapping['sql'])
+                sql_string = VRDCEntityMapper._generate_sql_string(
+                    table=field_mapping['table'],
+                    field=field_mapping['field'],
+                    alias=field_mapping['alias'],
+                    simplified_npi_aliases=simplified_npi_aliases,
+                    level=level_name
+                )
+                sql_parts.append(sql_string)
         
         return ',\n    '.join(sql_parts)
     
@@ -428,7 +459,7 @@ class VRDCEntityMapper:
         }
     
     @staticmethod
-    def get_sql_with_table_names(*, setting, year, month):
+    def get_sql_with_table_names(*, setting, year, month, simplified_npi_aliases=False):
         """
         Get SQL select list with actual database and table names.
         
@@ -436,6 +467,7 @@ class VRDCEntityMapper:
             setting (str): Benefit setting name
             year (int): Year
             month (int): Month number (1-12)
+            simplified_npi_aliases (bool): If True, use 'onpi' and 'pnpi' for NPI fields
             
         Returns:
             str: SQL select statement with full table names
@@ -450,12 +482,85 @@ class VRDCEntityMapper:
         for level_name, field_list in setting_fields.items():
             for field_mapping in field_list:
                 if field_mapping['table'] == 'CLAIM':
-                    sql_part = f"{claim_table}.{field_mapping['field']} AS {field_mapping['alias']}"
+                    full_table_name = claim_table
                 else:  # CLINE
-                    sql_part = f"{line_table}.{field_mapping['field']} AS {field_mapping['alias']}"
-                sql_parts.append(sql_part)
+                    full_table_name = line_table
+                
+                sql_string = VRDCEntityMapper._generate_sql_string(
+                    table=full_table_name,
+                    field=field_mapping['field'],
+                    alias=field_mapping['alias'],
+                    simplified_npi_aliases=simplified_npi_aliases,
+                    level=level_name
+                )
+                sql_parts.append(sql_string)
         
         return ',\n    '.join(sql_parts)
+    
+    @staticmethod
+    def get_npi_loop_sql(*, setting, year, month, npi_level):
+        """
+        Generate SQL for looping through NPI fields with simplified aliases.
+        
+        Args:
+            setting (str): Benefit setting name
+            year (int): Year
+            month (int): Month number (1-12)  
+            npi_level (str): 'organizational_npi' or 'personal_npi'
+            
+        Returns:
+            list: List of SQL strings, each with 'onpi' or 'pnpi' alias
+        """
+        if npi_level not in ['organizational_npi', 'personal_npi']:
+            raise ValueError("npi_level must be 'organizational_npi' or 'personal_npi'")
+            
+        table_info = VRDCEntityMapper.get_table_names(setting=setting, year=year, month=month)
+        setting_fields = VRDCEntityMapper.get_setting_fields(setting=setting)
+        
+        claim_table = f"{table_info['database']}.{table_info['claim_table']}"
+        line_table = f"{table_info['database']}.{table_info['line_table']}"
+        
+        sql_statements = []
+        if npi_level in setting_fields:
+            for field_mapping in setting_fields[npi_level]:
+                if field_mapping['table'] == 'CLAIM':
+                    full_table_name = claim_table
+                else:  # CLINE
+                    full_table_name = line_table
+                
+                alias = 'onpi' if npi_level == 'organizational_npi' else 'pnpi'
+                sql_statement = f"{full_table_name}.{field_mapping['field']} AS {alias}"
+                sql_statements.append(sql_statement)
+        
+        return sql_statements
+    
+    @staticmethod
+    def iterate_npi_fields(*, setting, npi_level):
+        """
+        Iterate through NPI fields for a setting with field metadata.
+        
+        Args:
+            setting (str): Benefit setting name
+            npi_level (str): 'organizational_npi' or 'personal_npi'
+            
+        Yields:
+            dict: Field info with table, field, original_alias, and simplified_alias
+        """
+        if npi_level not in ['organizational_npi', 'personal_npi']:
+            raise ValueError("npi_level must be 'organizational_npi' or 'personal_npi'")
+            
+        setting_fields = VRDCEntityMapper.get_setting_fields(setting=setting)
+        simplified_alias = 'onpi' if npi_level == 'organizational_npi' else 'pnpi'
+        
+        if npi_level in setting_fields:
+            for field_mapping in setting_fields[npi_level]:
+                yield {
+                    'table': field_mapping['table'],
+                    'field': field_mapping['field'],
+                    'original_alias': field_mapping['alias'],
+                    'simplified_alias': simplified_alias,
+                    'sql': f"{field_mapping['table']}.{field_mapping['field']} AS {simplified_alias}"
+                }
     
     @staticmethod
     def iterate_month_range(*, month_range, settings):
