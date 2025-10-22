@@ -84,7 +84,6 @@ class VRDCEntityMapper:
                 {'table': 'CLINE', 'field': 'ORG_NPI_NUM', 'alias': 'ORG_NPI_NUM'}
             ],
             'personal_npi': [
-                {'table': 'CLAIM', 'field': 'PRF_PHYSN_NPI', 'alias': 'PRF_PHYSN_NPI'},
                 {'table': 'CLAIM', 'field': 'CARR_LINE_MDPP_NPI_NUM', 'alias': 'CARR_LINE_MDPP_NPI_NUM'},
                 {'table': 'CLINE', 'field': 'PRF_PHYSN_NPI', 'alias': 'PRF_PHYSN_NPI'}
             ]
