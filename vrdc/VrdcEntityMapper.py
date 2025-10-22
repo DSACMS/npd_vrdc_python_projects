@@ -73,7 +73,7 @@ class VRDCEntityMapper:
         # bcarrier settings
         mappings['bcarrier'] = {
             'tax_id': [
-                {'table': 'CLAIM', 'field': 'TAX_NUM', 'alias': 'TAX_NUM'}
+                {'table': 'CLINE', 'field': 'TAX_NUM', 'alias': 'TAX_NUM'}
             ],
             'ccn': [],  # No CCN for bcarrier
             'organizational_npi': [
@@ -93,7 +93,7 @@ class VRDCEntityMapper:
         # dme settings
         mappings['dme'] = {
             'tax_id': [
-                {'table': 'CLAIM', 'field': 'TAX_NUM', 'alias': 'TAX_NUM'}
+                {'table': 'CLINE', 'field': 'TAX_NUM', 'alias': 'TAX_NUM'}
             ],
             'ccn': [
                 {'table': 'CLAIM', 'field': 'PRVDR_NUM', 'alias': 'PRVDR_NUM'}
