@@ -287,7 +287,7 @@ def run_all_tests():
             test_func()
             passed += 1
         except Exception as e:
-            print(f"❌ {test_func.__name__} FAILED: {e}")
+            print(f"FAILED: {test_func.__name__} - {e}")
             failed += 1
     
     print("=" * 60)
@@ -295,10 +295,10 @@ def run_all_tests():
     print("=" * 60)
     
     if failed == 0:
-        print("🎉 All tests passed!")
+        print("All tests passed!")
         return True
     else:
-        print("💥 Some tests failed!")
+        print("Some tests failed!")
         return False
 
 

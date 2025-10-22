@@ -83,7 +83,7 @@ class VRDCEntityMapBuilder:
                         view_name='vrdc_entity_map_view', 
                         table_name='vrdc_entity_map',
                         log_table_name='vrdc_entity_map_log',
-                        privacy_threshold=10, execute=True):
+                        privacy_threshold=10, execute=True, is_just_print=False):
         """
         Build VRDC entity map view and table for a given time range and settings.
         
@@ -98,6 +98,7 @@ class VRDCEntityMapBuilder:
             log_table_name (str): Name for log table
             privacy_threshold (int): Minimum beneficiaries threshold
             execute (bool): Whether to execute SQL or just return it
+            is_just_print (bool): If True, print SQL without executing (overrides execute)
             
         Returns:
             dict: SQL statements generated
@@ -203,7 +204,7 @@ SELECT
         
         # Execute SQL if requested
         if execute:
-            VRDCEntityMapBuilder.execute_sql_dict(sql_dict=sql)
+            VRDCEntityMapBuilder.execute_sql_dict(sql_dict=sql, is_just_print=is_just_print)
         
         return sql
     
@@ -217,17 +218,10 @@ SELECT
             is_just_print (bool): If True, print SQL without executing
         """
         for description, sql_statement in sql_dict.items():
-            print(f"\n{description}:")
-            print("=" * 50)
+            print(f"\n-- {description}:")
             print(sql_statement)
-            
             if is_just_print:
-                print("Just printing for now\n")
+                print("-- Just printing for now\n")
             else:
-                print("Running SQL...\n")
-                try:
-                    spark.sql(sql_statement)  # type: ignore
-                    print("✓ Completed successfully\n")
-                except Exception as e:
-                    print(f"❌ Error: {e}\n")
-                    raise
+                print("-- Running:")
+                spark.sql(sql_statement)  # type: ignore

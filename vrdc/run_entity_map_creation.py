@@ -28,7 +28,10 @@ entity_log_table_name = 'vrdc_entity_map_log'
 cms_privacy_threshold = 10
 
 # Time Range Configuration (modify these)
-analysis_time_range = MonthRange(start_year=2023, start_month=1, end_year=2023, end_month=12)
+analysis_start_year = 2023
+analysis_start_month = 1
+analysis_end_year = 2023
+analysis_end_month = 12
 
 # Settings to include (leave empty list for all settings)
 include_settings = []  # ['bcarrier', 'dme', 'inpatient'] or [] for all
@@ -40,23 +43,31 @@ is_just_print = True  # Set to True to print SQL without executing
 def main():
     """Main execution function for entity map creation."""
     
-    print("VRDC Entity Map Builder")
-    print("=" * 50)
-    print(f"Time Range: {analysis_time_range}")
+    # Create time range from configuration variables
+    analysis_time_range = MonthRange(
+        start_year=analysis_start_year, 
+        start_month=analysis_start_month,
+        end_year=analysis_end_year, 
+        end_month=analysis_end_month
+    )
+    
+    print("-- VRDC Entity Map Builder")
+    print("-- " + "=" * 50)
+    print(f"-- Time Range: {analysis_time_range}")
     
     # Handle settings
     settings_to_use = include_settings if include_settings else None
     if not include_settings:
         all_settings = VRDCEntityMapper.get_all_settings()
-        print(f"Including all settings: {all_settings}")
+        print(f"-- Including all settings: {all_settings}")
     else:
-        print(f"Including settings: {include_settings}")
+        print(f"-- Including settings: {include_settings}")
     
-    print(f"Privacy threshold: {cms_privacy_threshold} beneficiaries")
-    print(f"Output: {output_catalog}.{output_database}")
+    print(f"-- Privacy threshold: {cms_privacy_threshold} beneficiaries")
+    print(f"-- Output: {output_catalog}.{output_database}")
     
     if is_just_print:
-        print("\n⚠️  PRINT MODE - SQL will be displayed but not executed")
+        print("-- PRINT MODE - SQL will be displayed but not executed")
     
     # Build entity map
     sql_statements = VRDCEntityMapBuilder.build_entity_map(
@@ -69,14 +80,15 @@ def main():
         table_name=entity_map_table_name,
         log_table_name=entity_log_table_name,
         privacy_threshold=cms_privacy_threshold,
-        execute=not is_just_print
+        execute=True,  # Execute with is_just_print control
+        is_just_print=is_just_print
     )
     
     if not is_just_print:
-        print("\n🎉 Entity map creation completed successfully!")
-        print(f"\nView created: {output_catalog}.{output_database}.{entity_map_view_name}")
-        print(f"Table created: {output_catalog}.{output_database}.{entity_map_table_name}")
-        print(f"Log created: {output_catalog}.{output_database}.{entity_log_table_name}")
+        print("-- Entity map creation completed successfully!")
+        print(f"-- View created: {output_catalog}.{output_database}.{entity_map_view_name}")
+        print(f"-- Table created: {output_catalog}.{output_database}.{entity_map_table_name}")
+        print(f"-- Log created: {output_catalog}.{output_database}.{entity_log_table_name}")
         
         # Display sample results
         display_sql = f"""
@@ -84,7 +96,7 @@ SELECT * FROM {output_catalog}.{output_database}.{entity_map_table_name}
 ORDER BY bene_count DESC 
 LIMIT 10"""
         
-        print(f"\nSample results:")
+        print(f"-- Sample results:")
         print(display_sql)
         result_df = spark.sql(display_sql)  # type: ignore
         display(result_df)  # type: ignore
@@ -94,16 +106,24 @@ LIMIT 10"""
 
 def print_configuration():
     """Display current configuration settings."""
-    print("Current Configuration:")
-    print("-" * 30)
-    print(f"Time Range: {analysis_time_range}")
-    print(f"Settings: {include_settings if include_settings else 'All 7 settings'}")
-    print(f"Catalogs: {extracts_catalog} → {output_catalog}.{output_database}")
-    print(f"View Name: {entity_map_view_name}")
-    print(f"Table Name: {entity_map_table_name}")
-    print(f"Log Table: {entity_log_table_name}")
-    print(f"Privacy Threshold: {cms_privacy_threshold}")
-    print(f"Print Mode: {is_just_print}")
+    # Create time range from configuration variables
+    analysis_time_range = MonthRange(
+        start_year=analysis_start_year, 
+        start_month=analysis_start_month,
+        end_year=analysis_end_year, 
+        end_month=analysis_end_month
+    )
+    
+    print("-- Current Configuration:")
+    print("-- " + "-" * 30)
+    print(f"-- Time Range: {analysis_time_range}")
+    print(f"-- Settings: {include_settings if include_settings else 'All 7 settings'}")
+    print(f"-- Catalogs: {extracts_catalog} → {output_catalog}.{output_database}")
+    print(f"-- View Name: {entity_map_view_name}")
+    print(f"-- Table Name: {entity_map_table_name}")
+    print(f"-- Log Table: {entity_log_table_name}")
+    print(f"-- Privacy Threshold: {cms_privacy_threshold}")
+    print(f"-- Print Mode: {is_just_print}")
 
 
 def run_small_test():
@@ -123,10 +143,10 @@ def run_small_test():
         table_name='test_entity_table',
         log_table_name='test_entity_log',
         privacy_threshold=cms_privacy_threshold,
-        execute=not is_just_print
+        execute=True,  # Execute with is_just_print control
+        is_just_print=is_just_print
     )
     
-    print(f"Generated {len(test_sql)} SQL statements for test")
     return test_sql
 
 
