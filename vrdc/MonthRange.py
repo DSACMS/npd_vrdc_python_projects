@@ -1,5 +1,5 @@
 """
-Month Range Class for VRDC Data Processing
+MonthRange.py avoids having lots of arguments for start and end year/months
 
 Represents a range of months across years for iterating through VRDC data.
 Simple container for start and end month/year pairs that can be used
