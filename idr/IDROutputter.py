@@ -53,7 +53,6 @@ suitable for notebook environments. Errors are printed rather than logged.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from snowflake.snowpark.context import get_active_session  # type: ignore
 
 
 class IDROutputter(ABC):
@@ -99,6 +98,8 @@ class IDROutputter(ABC):
             dict: Export details including row count, file name, etc.
         """
         try:
+            # Import snowflake only when actually needed for execution
+            from snowflake.snowpark.context import get_active_session  # type: ignore
             session = get_active_session()
             ts = datetime.now().strftime("%Y_%m_%d_%H%M")
             

@@ -143,22 +143,46 @@ class FileVersionTester:
                                     print(f"WARNING: {name} in {py_file} has empty file_name_stub")
                                     continue
                                 
-                                # Create instance only to get SELECT query, but catch any connection errors
+                                # Get SELECT query using source code inspection to avoid database connections
                                 select_query = ""
                                 expected_columns = []
                                 
+                                # Try to extract query from source code first (safer approach)
                                 try:
-                                    # Create a temporary instance just to get the query
-                                    temp_instance = obj()
-                                    select_query = temp_instance.getSelectQuery()
+                                    import ast
                                     
-                                    # Extract expected columns using sqlglot
-                                    expected_columns = self._extract_columns_from_sql(sql_query=select_query)
-                                except Exception as query_error:
-                                    print(f"WARNING: Could not get SELECT query for {name}: {str(query_error)}")
-                                    # Try to extract from class attributes if available
-                                    if hasattr(obj, 'getSelectQuery'):
-                                        select_query = "SELECT query extraction failed - no Snowflake connection"
+                                    # Get the source code of getSelectQuery method
+                                    method_source = inspect.getsource(obj.getSelectQuery)
+                                    
+                                    # Parse and extract the return statement
+                                    tree = ast.parse(method_source)
+                                    for node in ast.walk(tree):
+                                        if isinstance(node, ast.Return) and isinstance(node.value, ast.Str):
+                                            select_query = node.value.s
+                                            expected_columns = self._extract_columns_from_sql(sql_query=select_query)
+                                            break
+                                        elif isinstance(node, ast.Return) and isinstance(node.value, ast.Constant):
+                                            # Only process if the constant is a string
+                                            if isinstance(node.value.value, str):
+                                                select_query = node.value.value
+                                                expected_columns = self._extract_columns_from_sql(sql_query=select_query)
+                                                break
+                                        elif isinstance(node, ast.Return) and isinstance(node.value, ast.JoinedStr):
+                                            # Handle f-strings - convert to approximate representation
+                                            select_query = f"F-string query detected - {len(node.value.values)} components"
+                                            expected_columns = ["f_string_query_needs_manual_analysis"]
+                                            break
+                                
+                                except Exception as source_error:
+                                    print(f"WARNING: Could not extract query from source for {name}: {str(source_error)}")
+                                    # Fall back to trying instantiation only as last resort
+                                    try:
+                                        temp_instance = obj()
+                                        select_query = temp_instance.getSelectQuery()
+                                        expected_columns = self._extract_columns_from_sql(sql_query=select_query)
+                                    except Exception as instance_error:
+                                        print(f"WARNING: Could not instantiate {name}: {str(instance_error)}")
+                                        select_query = "Query extraction failed - see class source"
                                         expected_columns = ["query_extraction_failed"]
                                 
                                 idr_info = IDROutputterInfo(

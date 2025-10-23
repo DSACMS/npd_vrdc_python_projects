@@ -81,9 +81,10 @@ class NPPESHistoricalAddressExporter(IDROutputter):
         """
 
 
-# Execute the export using the IDROutputter framework
-exporter = NPPESHistoricalAddressExporter()
-exporter.do_idr_output()
+if __name__ == '__main__':
+    # Execute the export using the IDROutputter framework
+    exporter = NPPESHistoricalAddressExporter()
+    exporter.do_idr_output()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

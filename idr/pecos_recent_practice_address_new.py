@@ -88,16 +88,17 @@ WHERE YEAR(IDR_TRANS_OBSLT_TS) = 9999 AND YEAR(IDR_TRANS_EFCTV_TS) > 2022 AND AD
         """
 
 
-# Execute both exports using the IDROutputter framework
-print("Exporting PECOS recent practice address data...")
-recent_exporter = PecosRecentPracticeAddressExporter()
-recent_exporter.do_idr_output()
+if __name__ == '__main__':
+    # Execute both exports using the IDROutputter framework
+    print("Exporting PECOS recent practice address data...")
+    recent_exporter = PecosRecentPracticeAddressExporter()
+    recent_exporter.do_idr_output()
 
-print("Exporting PECOS address summary data...")
-summary_exporter = PecosAddressSummaryExporter()
-summary_exporter.do_idr_output()
+    print("Exporting PECOS address summary data...")
+    summary_exporter = PecosAddressSummaryExporter()
+    summary_exporter.do_idr_output()
 
-print("Both exports completed!")
+    print("Both exports completed!")
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

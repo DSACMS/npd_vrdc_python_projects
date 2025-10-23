@@ -38,9 +38,8 @@ class MedicaidServiceAddressExporter(IDROutputter):
         self.patient_aggregation_threshold = 20
         self.year = 2025
         
-        # Generate unique temp table name
-        ts = datetime.now().strftime("%Y_%m_%d_%H%M")
-        self.temp_table_name = f"TEMP_MEDICAID_NPI_ADDRESSES_{ts}"
+        # Temp table name will be generated when needed (not at import time)
+        self.temp_table_name = None
         
         # Dictionary of claim-level NPI fields to process separately
         self.claim_npi_fields = {
@@ -62,11 +61,21 @@ class MedicaidServiceAddressExporter(IDROutputter):
             'CLM_LINE_ORDRG_PRVDR_NPI_NUM': 'line_ordering_provider'
         }
     
+    def _generate_temp_table_name(self) -> str:
+        """Generate unique temp table name when needed."""
+        if self.temp_table_name is None:
+            ts = datetime.now().strftime("%Y_%m_%d_%H%M")
+            self.temp_table_name = f"TEMP_MEDICAID_NPI_ADDRESSES_{ts}"
+        return self.temp_table_name
+    
     def prepareData(self) -> None:
         """Create temporary table with all NPI-address combinations."""
         session = get_active_session()
         
         print("Creating temporary NPI-address table...")
+        
+        # Generate temp table name
+        temp_table = self._generate_temp_table_name()
         
         union_queries = []
         
@@ -173,7 +182,7 @@ class MedicaidServiceAddressExporter(IDROutputter):
 
         # Create the temporary table with all NPI types combined
         create_temp_table_sql = f"""
-        CREATE OR REPLACE TEMPORARY TABLE {self.temp_table_name} AS (
+        CREATE OR REPLACE TEMPORARY TABLE {temp_table} AS (
             {' UNION ALL '.join(union_queries)}
         )
         """
@@ -186,6 +195,7 @@ class MedicaidServiceAddressExporter(IDROutputter):
         
         Aggregates the temporary table data with patient count thresholding.
         """
+        temp_table = self._generate_temp_table_name()
         return f"""
         SELECT 
             npi,
@@ -198,7 +208,7 @@ class MedicaidServiceAddressExporter(IDROutputter):
             MIN(claim_count) AS minimum_distinct_claim_count,
             COUNT(*) AS npi_address_combinations,
             LISTAGG(DISTINCT npi_column_type, '; ') AS npi_types_present
-        FROM {self.temp_table_name}
+        FROM {temp_table}
         GROUP BY    
             npi,
             service_address_line_1,
@@ -221,14 +231,15 @@ class MedicaidServiceAddressExporter(IDROutputter):
             session.sql(f"DROP TABLE IF EXISTS {self.temp_table_name}").collect()
 
 
-# Execute the export using the IDROutputter framework
-print("Creating temporary NPI-address table...")
-exporter = MedicaidServiceAddressExporter()
-# First run data preparation 
-exporter.prepareData()
-print("Exporting final aggregated results...")
-exporter.do_idr_output()
-print("Export completed successfully!")
+if __name__ == '__main__':
+    # Execute the export using the IDROutputter framework
+    print("Creating temporary NPI-address table...")
+    exporter = MedicaidServiceAddressExporter()
+    # First run data preparation 
+    exporter.prepareData()
+    print("Exporting final aggregated results...")
+    exporter.do_idr_output()
+    print("Export completed successfully!")
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

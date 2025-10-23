@@ -97,11 +97,12 @@ class MedicaidServiceAddressAnalysisExporter(IDROutputter):
         """
 
 
-# Execute the export using the IDROutputter framework
-print("Starting Medicaid Service Location Analysis...")
-exporter = MedicaidServiceAddressAnalysisExporter()
-exporter.do_idr_output()
-print("Analysis completed successfully!")
+if __name__ == '__main__':
+    # Execute the export using the IDROutputter framework
+    print("Starting Medicaid Service Location Analysis...")
+    exporter = MedicaidServiceAddressAnalysisExporter()
+    exporter.do_idr_output()
+    print("Analysis completed successfully!")
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
