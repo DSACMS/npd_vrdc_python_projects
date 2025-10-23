@@ -314,8 +314,8 @@ class FileVersionTester:
         
         csv_files = [f for f in os.listdir(self.csv_dir) if f.endswith('.csv')]
         
-        # Regex pattern to match: {stub}{filler}{version}.{timestamp}.csv
-        pattern = r'^(.+?)(.*?)(v\d+)\.(\d{4}_\d{2}_\d{2}_\d{4})\.csv$'
+        # Regex pattern to match: {stub}.{version}.{timestamp}.csv
+        pattern = r'^(.+?)\.(v\d+)\.(\d{4}_\d{2}_\d{2}_\d{4})\.csv$'
         
         for csv_file in csv_files:
             match = re.match(pattern, csv_file)
@@ -323,7 +323,7 @@ class FileVersionTester:
                 print(f"WARNING: CSV file doesn't match expected pattern: {csv_file}")
                 continue
             
-            base_stub, filler, version, timestamp = match.groups()
+            base_stub, version, timestamp = match.groups()
             full_path = os.path.join(self.csv_dir, csv_file)
             
             try:
@@ -346,7 +346,7 @@ class FileVersionTester:
                     file_name_stub=base_stub,
                     version_number=version,
                     timestamp=timestamp,
-                    filler=filler,
+                    filler="",  # No filler with new pattern
                     headers=headers,
                     line_count=line_count
                 )
@@ -418,16 +418,16 @@ class FileVersionTester:
                     status_messages.append("header mismatch")
                     overall_status = "warning"
                     
-                    print(f"  Expected columns ({len(expected_cols)}): {expected_cols[:5]}...")
-                    print(f"  Actual columns ({len(actual_cols)}): {actual_cols[:5]}...")
+                    print(f"  Expected columns ({len(expected_cols)}): {expected_cols}")
+                    print(f"  Actual columns ({len(actual_cols)}): {actual_cols}")
                     
                     # Show differences
                     missing = set(expected_cols) - set(actual_cols)
                     extra = set(actual_cols) - set(expected_cols)
                     if missing:
-                        print(f"  Missing columns: {list(missing)[:5]}...")
+                        print(f"  Missing columns: {list(missing)}")
                     if extra:
-                        print(f"  Extra columns: {list(extra)[:5]}...")
+                        print(f"  Extra columns: {list(extra)}")
                 
                 print(f"  CSV Lines: {csv_info.line_count}")
                 print(f"  CSV File: {csv_info.filename}")
