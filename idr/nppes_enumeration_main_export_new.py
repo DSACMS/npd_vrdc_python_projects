@@ -18,6 +18,8 @@ This is the NEW implementation using the IDROutputter base class to eliminate co
 
 # Import python packages
 import pandas as pd
+from datetime import datetime
+from snowflake.snowpark.context import get_active_session  # type: ignore
 
 # Import the IDROutputter base class
 from IDROutputter import IDROutputter
@@ -153,7 +155,8 @@ class NPPESMainExporter(IDROutputter):
     
     def do_idr_output(self) -> None:
         """
-        Override to include PII status in filename and validate pepper is set.
+        Override to validate pepper is set before export.
+        PII status is now included as filler content between stub and version, maintaining naming convention.
         """
         # Validate that pepper has been set before proceeding with database operations
         if self.local_pepper is None:
@@ -163,24 +166,48 @@ class NPPESMainExporter(IDROutputter):
                 f"The pepper should come from your notebook environment for security."
             )
         
-        # Create enhanced filename that includes PII content indicator
-        # Temporarily modify the file_name_stub to include PII status
-        original_stub = self.file_name_stub
-        self.file_name_stub = f"{original_stub}.{self.pii_col_content}"
-        
+        # Override the _execute_export to include PII status in filename while maintaining convention
         try:
-            # Call parent implementation
-            super().do_idr_output()
-        finally:
-            # Restore original file_name_stub
-            self.file_name_stub = original_stub
+            session = get_active_session()
+            ts = datetime.now().strftime("%Y_%m_%d_%H%M")
+            # Include PII status as filler content: {file_name_stub}.{pii_content}.{version}.{timestamp}.csv
+            file_name = f"@~/{self.file_name_stub}.{self.pii_col_content}.{self.version_number}.{ts}.csv"
+            
+            # Get the select query
+            select_query = self.getSelectQuery()
+            
+            copy_into_sql = f"""
+COPY INTO {file_name}
+FROM (
+{select_query}
+)""" + """
+FILE_FORMAT = (
+  TYPE = CSV
+  FIELD_DELIMITER = ','
+  FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+  COMPRESSION = NONE
+)
+HEADER = TRUE
+OVERWRITE = TRUE;
+"""
+            
+            print(f"Starting export for {self.file_name_stub} to {file_name}")
+            session.sql(copy_into_sql).collect()
+            print(f"Successfully completed export for {self.file_name_stub}")
+            
+        except Exception as e:
+            print(f"NPPESMainExporter.do_idr_output Error: Failed to export {self.file_name_stub}")
+            print(f"Error details: {str(e)}")
+            print(f"This could be due to invalid SQL syntax, connection issues, or permission problems")
+            raise
 
 
-# Execute the export using the IDROutputter framework
-exporter = NPPESMainExporter()
-# Set pepper from notebook environment before running export
-# exporter.setPepper(pepper)  # pepper should be defined in notebook environment - uncomment in notebook
-exporter.do_idr_output()
+if __name__ == '__main__':
+    # Execute the export using the IDROutputter framework
+    exporter = NPPESMainExporter()
+    # Set pepper from notebook environment before running export
+    # exporter.setPepper(pepper)  # pepper should be defined in notebook environment - uncomment in notebook
+    exporter.do_idr_output()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
