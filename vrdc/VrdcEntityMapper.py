@@ -21,8 +21,12 @@ proper database and table naming conventions:
 
 try:
     from .MonthRange import MonthRange
+
 except ImportError:
-    from MonthRange import MonthRange
+    try:
+        from MonthRange import MonthRange
+    except ImportError:
+        print("Loading from previous cell")
 
 
 class VRDCEntityMapper:

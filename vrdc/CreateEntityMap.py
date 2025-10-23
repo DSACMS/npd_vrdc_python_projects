@@ -71,8 +71,13 @@ try:
     from .MonthRange import MonthRange
     from .VrdcEntityMapper import VRDCEntityMapper
 except ImportError:
-    from MonthRange import MonthRange
-    from VrdcEntityMapper import VRDCEntityMapper
+    try:
+        from MonthRange import MonthRange
+        from VrdcEntityMapper import VRDCEntityMapper
+    except ImportError:
+        print("Loading from previous cell")
+
+
 from datetime import datetime
 
 
