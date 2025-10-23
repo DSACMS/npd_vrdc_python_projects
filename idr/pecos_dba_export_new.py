@@ -16,7 +16,10 @@ import pandas as pd
 from datetime import datetime
 
 # Import the IDROutputter base class
-from IDROutputter import IDROutputter
+try:
+	from IDROutputter import IDROutputter
+except ImportError:
+     print("Loading IDROutputter from previous cell")
 
 
 class PecosDbaExporter(IDROutputter):

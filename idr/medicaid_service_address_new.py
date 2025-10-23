@@ -18,7 +18,10 @@ from datetime import datetime
 from snowflake.snowpark.context import get_active_session  # type: ignore
 
 # Import the IDROutputter base class
-from IDROutputter import IDROutputter
+try:
+	from IDROutputter import IDROutputter
+except ImportError:
+     print("Loading IDROutputter from previous cell")
 
 
 class MedicaidServiceAddressExporter(IDROutputter):

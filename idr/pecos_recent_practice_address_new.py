@@ -15,7 +15,10 @@ This is the NEW implementation using the IDROutputter base class to eliminate co
 import pandas as pd
 
 # Import the IDROutputter base class
-from IDROutputter import IDROutputter
+try:
+	from IDROutputter import IDROutputter
+except ImportError:
+     print("Loading IDROutputter from previous cell")
 
 
 class PecosRecentPracticeAddressExporter(IDROutputter):
