@@ -83,16 +83,32 @@ class IDROutputter(ABC):
     file_name_stub: str = ""  # Must be overridden by subclass
     
     @staticmethod
-    def _execute_export(*, select_query: str, file_name_stub: str, version_number: str) -> None:
+    def _execute_export(*, select_query: str, file_name_stub: str, version_number: str, filename_components: list[str] | None = None) -> dict:
         """
         Static method that accepts a SELECT query and file name stub, performs the output.
         Puts SELECT query into COPY INTO {some_file_name} FROM ( {select_query} ) string
         and executes the query in the same manner as performed in the existing files.
+        
+        Args:
+            select_query: The SQL SELECT query to export
+            file_name_stub: Base filename
+            version_number: Version identifier
+            filename_components: Optional additional components for filename
+        
+        Returns:
+            dict: Export details including row count, file name, etc.
         """
         try:
             session = get_active_session()
             ts = datetime.now().strftime("%Y_%m_%d_%H%M")
-            file_name = f"@~/{file_name_stub}.{version_number}.{ts}.csv"
+            
+            # Build filename with optional components
+            filename_parts = [file_name_stub]
+            if filename_components:
+                filename_parts.extend(filename_components)
+            filename_parts.extend([version_number, ts])
+            
+            file_name = f"@~/{'.'.join(filename_parts)}.csv"
             
             copy_into_sql = f"""
 COPY INTO {file_name}
@@ -110,8 +126,43 @@ OVERWRITE = TRUE;
 """
             
             print(f"Starting export for {file_name_stub} to {file_name}")
-            session.sql(copy_into_sql).collect()
+            copy_result = session.sql(copy_into_sql).collect()
             print(f"Successfully completed export for {file_name_stub}")
+            
+            # Extract export details from the COPY command result
+            export_details = {
+                'file_name': file_name,
+                'file_name_stub': file_name_stub,
+                'version_number': version_number,
+                'timestamp': ts,
+                'rows_exported': 0,
+                'status': 'SUCCESS'
+            }
+            
+            # Parse the COPY INTO result to get row count
+            if copy_result and len(copy_result) > 0:
+                # The COPY INTO command typically returns a result with the file name and rows copied
+                result_row = copy_result[0]
+                if hasattr(result_row, '__getitem__') and len(result_row) > 1:
+                    # Try to extract rows from the result (usually in the second column)
+                    try:
+                        export_details['rows_exported'] = int(result_row[1])
+                    except (ValueError, IndexError, TypeError):
+                        # If we can't parse the row count, try to get it from a different method
+                        pass
+            
+            # If we couldn't get row count from COPY result, try counting the source query
+            if export_details['rows_exported'] == 0:
+                try:
+                    count_query = f"SELECT COUNT(*) FROM ({select_query})"
+                    count_result = session.sql(count_query).collect()
+                    if count_result and len(count_result) > 0:
+                        export_details['rows_exported'] = int(count_result[0][0])
+                except Exception as count_error:
+                    print(f"Warning: Could not determine row count - {str(count_error)}")
+                    export_details['rows_exported'] = "Unknown"
+            
+            return export_details
             
         except Exception as e:
             print(f"IDROutputter._execute_export Error: Failed to export {file_name_stub}")
@@ -125,11 +176,36 @@ OVERWRITE = TRUE;
         Must-override method that each subclass must implement to return the SELECT query string.
         """
         pass
+    
+    def pre_export_validation(self) -> None:
+        """
+        Hook method that subclasses can override to perform custom validation before export.
+        Called before any export operations begin.
+        """
+        pass
+    
+    def get_filename_components(self) -> list[str]:
+        """
+        Hook method that subclasses can override to add custom components to the filename.
+        
+        Returns:
+            list[str]: Additional filename components to insert between file_name_stub and version.
+                      Components will be joined with dots.
+        
+        Default implementation returns empty list for standard filename format:
+        {file_name_stub}.{version_number}.{timestamp}.csv
+        
+        Override to customize filename format, e.g.:
+        {file_name_stub}.{custom_component}.{version_number}.{timestamp}.csv
+        """
+        return []
         
     def do_idr_output(self) -> None:
         """
         Main method that calls getSelectQuery() to get the query string 
         and then passes that query to the static class method to perform the output.
+        
+        Displays export details including row count and file information after completion.
         
         Uses the file_name_stub class property which must be overridden by subclass.
         """
@@ -143,20 +219,42 @@ OVERWRITE = TRUE;
             
             print(f"do_idr_output: Starting process for {self.file_name_stub} (version {self.version_number})")
             
+            # Call pre-export validation hook for custom validation
+            self.pre_export_validation()
+            
             # Call getSelectQuery() method to get the query string
             select_query = self.getSelectQuery()
             
             if not select_query or not select_query.strip():
                 raise ValueError("getSelectQuery() returned empty or null query")
             
-            # Pass the query to the static class method to perform the output
-            self._execute_export(
+            # Get custom filename components from hook
+            filename_components = self.get_filename_components()
+            
+            # Pass the query to the static class method to perform the output and get details
+            export_details = self._execute_export(
                 select_query=select_query, 
                 file_name_stub=self.file_name_stub,
-                version_number=self.version_number
+                version_number=self.version_number,
+                filename_components=filename_components if filename_components else None
             )
             
             print(f"do_idr_output: Completed process for {self.file_name_stub}")
+            
+            # Display export details
+            print("\n" + "=" * 50)
+            print("EXPORT DETAILS")
+            print("=" * 50)
+            print(f"File exported: {export_details['file_name']}")
+            print(f"Export stub: {export_details['file_name_stub']}")
+            print(f"Version: {export_details['version_number']}")
+            print(f"Timestamp: {export_details['timestamp']}")
+            print(f"Rows exported: {export_details['rows_exported']:,}" if isinstance(export_details['rows_exported'], int) else f"Rows exported: {export_details['rows_exported']}")
+            print(f"Status: {export_details['status']}")
+            print("=" * 50)
+            print("\nTo download use:")
+            print('snowsql -c cms_idr -q "GET @~/ file://. PATTERN=\'*.csv\';"')
+            print("Or look in ../misc_scripts/ for download_and_merge_all_snowflake_csv.sh")
             
         except Exception as e:
             print(f"IDROutputter.do_idr_output Error: Failed to complete output for {self.file_name_stub if hasattr(self, 'file_name_stub') and self.file_name_stub else '[file_name_stub not set]'}")

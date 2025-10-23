@@ -153,53 +153,26 @@ class NPPESMainExporter(IDROutputter):
             FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_DMGRPHCS_CRNT
         """
     
-    def do_idr_output(self) -> None:
+    def pre_export_validation(self) -> None:
         """
-        Override to validate pepper is set before export.
-        PII status is now included as filler content between stub and version, maintaining naming convention.
+        Validate that pepper has been set before export.
+        Called by the base class before any export operations begin.
         """
-        # Validate that pepper has been set before proceeding with database operations
         if self.local_pepper is None:
             raise ValueError(
                 f"Pepper must be set before running do_idr_output(). "
                 f"Call setPepper('your_pepper_value') first. "
                 f"The pepper should come from your notebook environment for security."
             )
+    
+    def get_filename_components(self) -> list[str]:
+        """
+        Add PII status component to filename.
+        Returns PII content to be included in filename between stub and version.
         
-        # Override the _execute_export to include PII status in filename while maintaining convention
-        try:
-            session = get_active_session()
-            ts = datetime.now().strftime("%Y_%m_%d_%H%M")
-            # Include PII status as filler content: {file_name_stub}.{pii_content}.{version}.{timestamp}.csv
-            file_name = f"@~/{self.file_name_stub}.{self.pii_col_content}.{self.version_number}.{ts}.csv"
-            
-            # Get the select query
-            select_query = self.getSelectQuery()
-            
-            copy_into_sql = f"""
-COPY INTO {file_name}
-FROM (
-{select_query}
-)""" + """
-FILE_FORMAT = (
-  TYPE = CSV
-  FIELD_DELIMITER = ','
-  FIELD_OPTIONALLY_ENCLOSED_BY = '"'
-  COMPRESSION = NONE
-)
-HEADER = TRUE
-OVERWRITE = TRUE;
-"""
-            
-            print(f"Starting export for {self.file_name_stub} to {file_name}")
-            session.sql(copy_into_sql).collect()
-            print(f"Successfully completed export for {self.file_name_stub}")
-            
-        except Exception as e:
-            print(f"NPPESMainExporter.do_idr_output Error: Failed to export {self.file_name_stub}")
-            print(f"Error details: {str(e)}")
-            print(f"This could be due to invalid SQL syntax, connection issues, or permission problems")
-            raise
+        Results in filename format: {file_name_stub}.{pii_content}.{version}.{timestamp}.csv
+        """
+        return [self.pii_col_content]
 
 
 if __name__ == '__main__':
