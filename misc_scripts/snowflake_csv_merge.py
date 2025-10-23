@@ -38,7 +38,7 @@ def merge_group(root, files, outdir="."):
     # Sort files so order is consistent
     files = sorted(files)
 
-    outname = os.path.join(outdir, f"{root}.merged.csv")
+    outname = os.path.join(outdir, f"{root}")
     print(f"Merging {len(files)} files into {outname}")
 
     # Read first file with header to establish column structure
