@@ -43,7 +43,7 @@ import inspect
 import re
 import csv
 import subprocess
-from typing import Dict, List, Tuple, Optional, Any
+from typing import List
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -90,10 +90,11 @@ class CsvFileInfo:
 class FileVersionTester:
     """Main class for testing file versions and consistency."""
     
-    def __init__(self, *, python_dir: str, csv_dir: str):
+    def __init__(self, *, python_dir: str, csv_dir: str, show_missing_csv: bool = False):
         """Initialize with directories to scan."""
         self.python_dir = python_dir
         self.csv_dir = csv_dir
+        self.show_missing_csv = show_missing_csv
         self.idr_classes: List[IDROutputterInfo] = []
         self.csv_files: List[CsvFileInfo] = []
         
@@ -143,53 +144,35 @@ class FileVersionTester:
                                     print(f"WARNING: {name} in {py_file} has empty file_name_stub")
                                     continue
                                 
-                                # Get SELECT query using source code inspection to avoid database connections
+                                # Get SELECT query by instantiating class and calling getSelectQuery()
+                                # This is the intended design of IDROutputter classes
                                 select_query = ""
                                 expected_columns = []
                                 
-                                # Try to extract query from source code first (safer approach)
                                 try:
-                                    import ast
+                                    # Instantiate the class and get the query
+                                    instance = obj()
+                                    select_query = instance.getSelectQuery()
                                     
-                                    # Get the source code of getSelectQuery method
-                                    method_source = inspect.getsource(obj.getSelectQuery)
-                                    
-                                    # Parse and extract the return statement
-                                    tree = ast.parse(method_source)
-                                    for node in ast.walk(tree):
-                                        if isinstance(node, ast.Return) and isinstance(node.value, ast.Str):
-                                            select_query = node.value.s
-                                            expected_columns = self._extract_columns_from_sql(sql_query=select_query)
-                                            break
-                                        elif isinstance(node, ast.Return) and isinstance(node.value, ast.Constant):
-                                            # Only process if the constant is a string
-                                            if isinstance(node.value.value, str):
-                                                select_query = node.value.value
-                                                expected_columns = self._extract_columns_from_sql(sql_query=select_query)
-                                                break
-                                        elif isinstance(node, ast.Return) and isinstance(node.value, ast.JoinedStr):
-                                            # Handle f-strings - convert to approximate representation
-                                            select_query = f"F-string query detected - {len(node.value.values)} components"
-                                            expected_columns = ["f_string_query_needs_manual_analysis"]
-                                            break
-                                
-                                except Exception as source_error:
-                                    print(f"WARNING: Could not extract query from source for {name}: {str(source_error)}")
-                                    # Fall back to trying instantiation only as last resort
-                                    try:
-                                        temp_instance = obj()
-                                        select_query = temp_instance.getSelectQuery()
+                                    if select_query and select_query.strip():
+                                        # Use sqlglot to parse the SQL and extract columns
                                         expected_columns = self._extract_columns_from_sql(sql_query=select_query)
-                                    except Exception as instance_error:
-                                        print(f"WARNING: Could not instantiate {name}: {str(instance_error)}")
-                                        select_query = "Query extraction failed - see class source"
-                                        expected_columns = ["query_extraction_failed"]
+                                    else:
+                                        print(f"WARNING: {name} returned empty query")
+                                        select_query = "Empty query returned"
+                                        expected_columns = ["empty_query"]
+                                        
+                                except Exception as e:
+                                    print(f"ERROR: Could not instantiate {name} or get query: {str(e)}")
+                                    # If this class can't be instantiated, it needs to be fixed
+                                    select_query = f"Class instantiation failed: {str(e)}"
+                                    expected_columns = ["class_needs_fixing"]
                                 
                                 idr_info = IDROutputterInfo(
                                     class_name=name,
                                     file_name_stub=file_name_stub,
                                     version_number=version_number,
-                                    select_query=select_query,
+                                    select_query=str(select_query),  # Explicit cast to ensure it's a string
                                     expected_columns=expected_columns,
                                     file_path=file_path
                                 )
@@ -243,40 +226,64 @@ class FileVersionTester:
         """
         Extract column names from a SELECT query using sqlglot.
         Returns the final output column names including aliases.
+        Handles simple SELECT, UNION, and other compound queries.
         """
         try:
             # Parse the SQL query
             parsed = sqlglot.parse_one(sql_query, dialect="snowflake")
             
-            if not isinstance(parsed, exp.Select):
-                raise ValueError("Not a SELECT statement")
-            
             columns = []
-            for expression in parsed.expressions:
-                if isinstance(expression, exp.Alias):
-                    # Use the alias name
-                    columns.append(expression.alias.lower())
-                elif hasattr(expression, 'name'):
-                    # Use the column name
-                    columns.append(expression.name.lower())
-                elif isinstance(expression, exp.Column):
-                    # Extract column name
-                    columns.append(expression.this.lower())
-                else:
-                    # For complex expressions, try to get a string representation
-                    col_str = str(expression).strip()
-                    if col_str and not col_str.startswith('('):
-                        # Clean up the column name
-                        col_str = re.sub(r'[^\w]', '_', col_str).strip('_').lower()
-                        if col_str:
-                            columns.append(col_str)
             
-            return [col.strip() for col in columns if col.strip()]
+            # Handle different query types
+            if isinstance(parsed, exp.Select):
+                # Simple SELECT statement
+                columns = self._extract_columns_from_select(parsed)
+            elif isinstance(parsed, exp.Union):
+                # UNION query - extract from the first SELECT
+                if parsed.left and isinstance(parsed.left, exp.Select):
+                    columns = self._extract_columns_from_select(parsed.left)
+                elif parsed.right and isinstance(parsed.right, exp.Select):
+                    columns = self._extract_columns_from_select(parsed.right)
+            elif hasattr(parsed, 'expressions') and parsed.expressions:
+                # Try to find a SELECT within the parsed structure
+                for expr in parsed.expressions:
+                    if isinstance(expr, exp.Select):
+                        columns = self._extract_columns_from_select(expr)
+                        break
+            
+            if not columns:
+                raise ValueError(f"Could not extract columns from {type(parsed)} statement")
+            
+            return columns
             
         except Exception as e:
-            print(f"WARNING: Could not parse SQL query: {str(e)}")
+            print(f"WARNING: Could not parse SQL query with sqlglot: {str(e)}")
             # Fallback: try to extract column names using regex
             return self._fallback_column_extraction(sql_query=sql_query)
+    
+    def _extract_columns_from_select(self, select_expr: exp.Select) -> List[str]:
+        """Extract columns from a SELECT expression."""
+        columns = []
+        for expression in select_expr.expressions:
+            if isinstance(expression, exp.Alias):
+                # Use the alias name
+                columns.append(expression.alias.lower())
+            elif hasattr(expression, 'name'):
+                # Use the column name
+                columns.append(expression.name.lower())
+            elif isinstance(expression, exp.Column):
+                # Extract column name
+                columns.append(expression.this.lower())
+            else:
+                # For complex expressions, try to get a string representation
+                col_str = str(expression).strip()
+                if col_str and not col_str.startswith('('):
+                    # Clean up the column name
+                    col_str = re.sub(r'[^\w]', '_', col_str).strip('_').lower()
+                    if col_str:
+                        columns.append(col_str)
+        
+        return [col.strip() for col in columns if col.strip()]
     
     def _fallback_column_extraction(self, *, sql_query: str) -> List[str]:
         """Fallback method to extract column names using regex."""
@@ -406,14 +413,18 @@ class FileVersionTester:
         
         # Analyze each IDROutputter class
         for idr_info in self.idr_classes:
+            # Find matching CSV files
+            key = f"{idr_info.file_name_stub}#{idr_info.version_number}"
+            matching_csvs = csv_by_stub_version.get(key, [])
+            
+            # Skip classes without matching CSV files unless show_missing_csv is enabled
+            if not matching_csvs and not self.show_missing_csv:
+                continue
+                
             print(f"\nClass: {Colors.BOLD}{idr_info.class_name}{Colors.RESET}")
             print(f"File Name Stub: {idr_info.file_name_stub}")
             print(f"Version: {idr_info.version_number}")
             print(f"Expected Columns: {len(idr_info.expected_columns)}")
-            
-            # Find matching CSV files
-            key = f"{idr_info.file_name_stub}#{idr_info.version_number}"
-            matching_csvs = csv_by_stub_version.get(key, [])
             
             status_messages = []
             overall_status = "current"
@@ -482,12 +493,20 @@ class FileVersionTester:
         print(f"Total CSV files found: {len(self.csv_files)}")
         print(f"CSV files without matching classes: {len(orphan_csvs)}")
         
-        # Count status types
+        # Count status types (only for classes that were actually displayed)
         current_count = 0
         warning_count = 0
+        classes_displayed = 0
+        
         for idr_info in self.idr_classes:
             key = f"{idr_info.file_name_stub}#{idr_info.version_number}"
             matching_csvs = csv_by_stub_version.get(key, [])
+            
+            # Skip classes without matching CSV files unless show_missing_csv is enabled
+            if not matching_csvs and not self.show_missing_csv:
+                continue
+                
+            classes_displayed += 1
             latest_version = latest_versions.get(idr_info.file_name_stub)
             
             has_issues = (
@@ -509,6 +528,7 @@ class FileVersionTester:
             else:
                 current_count += 1
         
+        print(f"Classes analyzed in this report: {classes_displayed}")
         print(f"Classes with {Colors.GREEN}current{Colors.RESET} status: {current_count}")
         print(f"Classes with {Colors.YELLOW}warning{Colors.RESET} status: {warning_count}")
 
@@ -537,6 +557,12 @@ Examples:
         help='Directory containing CSV files to analyze'
     )
     
+    parser.add_argument(
+        '--show-missing-csv', 
+        action='store_true',
+        help='Show information for IDROutputter classes even when no matching CSV files are found'
+    )
+    
     args = parser.parse_args()
     
     # Validate directories exist
@@ -549,7 +575,7 @@ Examples:
         sys.exit(1)
     
     # Create tester instance and run analysis
-    tester = FileVersionTester(python_dir=args.python_dir, csv_dir=args.csv_dir)
+    tester = FileVersionTester(python_dir=args.python_dir, csv_dir=args.csv_dir, show_missing_csv=args.show_missing_csv)
     
     try:
         print("Starting file version analysis...")
