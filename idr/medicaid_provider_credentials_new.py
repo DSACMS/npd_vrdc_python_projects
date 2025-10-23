@@ -34,8 +34,9 @@ class MedicaidProviderCredentialsExporter(IDROutputter):
     Resolves license type codes and excludes non-useful license entries.
     """
     
-    # Class property - version number for filename
+    # Class properties  
     version_number: str = "v01"
+    file_name_stub: str = "medicaid_provider_credentials"
     
     def getSelectQuery(self) -> str:
         """
@@ -66,7 +67,7 @@ class MedicaidProviderCredentialsExporter(IDROutputter):
 
 # Execute the export using the IDROutputter framework
 exporter = MedicaidProviderCredentialsExporter()
-exporter.do_idr_output(file_name_stub="medicaid_provider_credentials")
+exporter.do_idr_output()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

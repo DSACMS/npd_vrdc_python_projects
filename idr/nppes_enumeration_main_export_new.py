@@ -32,12 +32,12 @@ class NPPESMainExporter(IDROutputter):
     
     # Class properties
     version_number: str = "v01"
+    file_name_stub: str = "nppes_main_idr_export"
     is_export_pii: bool = False  # Set to True to export PII data
     
     def __init__(self):
-        # pepper should be defined in the notebook environment for security
-        # DO NOT DEFINE IT IN THIS FILE!
-        self.local_pepper = pepper  # This should have a warning as pepper should be external
+        # Initialize pepper as None - must be set via setPepper() before database operations
+        self.local_pepper = None
         
         # Set PII-related properties based on export flag
         if self.is_export_pii:
@@ -47,13 +47,32 @@ class NPPESMainExporter(IDROutputter):
             self.pii_col_content = 'Provider_PII_obscured'
             self.pii_comment_out = '--'  # SQL comment filters out PII
     
+    def setPepper(self, pepper_value: str) -> None:
+        """
+        Set the pepper value for hashing operations.
+        
+        This method must be called before do_idr_output() to set the pepper
+        used for sensitive data hashing. For security, the pepper should come
+        from the notebook environment, not be defined in code.
+        
+        Args:
+            pepper_value (str): The pepper string to use for hashing
+        """
+        self.local_pepper = pepper_value
+    
     def getSelectQuery(self) -> str:
         """
         Returns the SELECT query for NPPES main export with conditional PII handling.
         
         Uses pepper for hashing sensitive data and conditionally includes/excludes
         PII fields based on the is_export_pii flag.
+        
+        If pepper hasn't been set via setPepper(), uses 'temp_pepper' as default
+        for SQL generation purposes.
         """
+        # Use actual pepper if set, otherwise use temp placeholder for query generation
+        pepper_to_use = self.local_pepper if self.local_pepper is not None else 'temp_pepper'
+        
         return f"""
             SELECT
                 '{self.pii_col_content}' AS does_file_contain_pii,
@@ -66,10 +85,10 @@ class NPPESMainExporter(IDROutputter):
                 {self.pii_comment_out} PRVDR_SSN_NUM, --pii
                 {self.pii_comment_out} PRVDR_TIN_NUM, --pii
                 PRVDR_EIN_NUM, 
-                -- pepper is not defined in this script but in a different snowflake notebook for security. DO NOT DEFINE IT IN THIS FILE! 
+                -- pepper is set via setPepper() method for security. Uses temp_pepper for query generation if not set.
 
                 CASE WHEN PRVDR_EIN_NUM IS NOT NULL THEN 
-                    SHA2('{self.local_pepper}' || PRVDR_EIN_NUM, 512)
+                    SHA2('{pepper_to_use}' || PRVDR_EIN_NUM, 512)
                 ELSE NULL END AS PRVDR_EIN_NUM_peppered_hash_sha512,
 
                 PRVDR_ENMRTN_DT,
@@ -96,7 +115,7 @@ class NPPESMainExporter(IDROutputter):
                 
 
                 CASE WHEN PRVDR_PRNT_ORG_TIN_NUM IS NOT NULL THEN 
-                    SHA2('{self.local_pepper}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
+                    SHA2('{pepper_to_use}' || PRVDR_PRNT_ORG_TIN_NUM, 512)
                 ELSE NULL END AS PRVDR_PRNT_ORG_TIN_NUM_peppered_hash_sha512,
 
                 {self.pii_comment_out} PRVDR_PRMRY_LANG_TXT, -- pii which is further greenlocked!!! 
@@ -132,20 +151,36 @@ class NPPESMainExporter(IDROutputter):
             FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_DMGRPHCS_CRNT
         """
     
-    def do_idr_output(self, *, file_name_stub: str) -> None:
+    def do_idr_output(self) -> None:
         """
-        Override to include PII status in filename.
+        Override to include PII status in filename and validate pepper is set.
         """
-        # Create filename that includes PII content indicator
-        enhanced_filename = f"{file_name_stub}.{self.pii_col_content}"
+        # Validate that pepper has been set before proceeding with database operations
+        if self.local_pepper is None:
+            raise ValueError(
+                f"Pepper must be set before running do_idr_output(). "
+                f"Call setPepper('your_pepper_value') first. "
+                f"The pepper should come from your notebook environment for security."
+            )
         
-        # Call parent implementation with enhanced filename
-        super().do_idr_output(file_name_stub=enhanced_filename)
+        # Create enhanced filename that includes PII content indicator
+        # Temporarily modify the file_name_stub to include PII status
+        original_stub = self.file_name_stub
+        self.file_name_stub = f"{original_stub}.{self.pii_col_content}"
+        
+        try:
+            # Call parent implementation
+            super().do_idr_output()
+        finally:
+            # Restore original file_name_stub
+            self.file_name_stub = original_stub
 
 
 # Execute the export using the IDROutputter framework
 exporter = NPPESMainExporter()
-exporter.do_idr_output(file_name_stub="nppes_main_idr_export")
+# Set pepper from notebook environment before running export
+# exporter.setPepper(pepper)  # pepper should be defined in notebook environment - uncomment in notebook
+exporter.do_idr_output()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

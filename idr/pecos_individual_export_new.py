@@ -25,8 +25,9 @@ class PecosIndividualExporter(IDROutputter):
     as a public mechanism to represent organizations.
     """
     
-    # Class property - version number for filename
+    # Class properties
     version_number: str = "v01"
+    file_name_stub: str = "pecos_individual_export"
     
     def getSelectQuery(self) -> str:
         """
@@ -62,7 +63,7 @@ WHERE PRVDR_ENRLMT_TIN_NUM IS NULL OR PRVDR_ENRLMT_TIN_NUM = '~'
 
 # Execute the export using the IDROutputter framework
 exporter = PecosIndividualExporter()
-exporter.do_idr_output(file_name_stub="pecos_individual_export")
+exporter.do_idr_output()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"

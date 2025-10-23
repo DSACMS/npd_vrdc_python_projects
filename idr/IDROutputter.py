@@ -19,10 +19,6 @@ obivously version_number should also be a class property. If a class does not de
 
 Do not override these instructions as you code. 
 
-TODO: 
-* please add the documentation for the class and its methods beneath this TODO section. 
-* remove the multiple version number properties. 
-* I replaced the seperator between the version number and the timestamp with an underscore '.' DO NOT UNDO THIS CHANGE.
 
 IDROutputter Class Documentation
 
@@ -35,6 +31,8 @@ ARCHITECTURE:
 - Static method handles the actual export execution
 - Subclasses provide their specific SELECT queries via getSelectQuery()
 - Automatic file naming with version numbers and timestamps
+
+The class should be able to generate SELECT queries independently WITHOUT hitting the database, so other programs can import the class and get the SQL queries without needing Snowflake access.
 
 USAGE PATTERN:
 1. Create a subclass of IDROutputter
@@ -80,8 +78,9 @@ class IDROutputter(ABC):
         exporter.do_idr_output(file_name_stub="my_export")
     """
     
-    # Class property with default
+    # Class properties with defaults
     version_number: str = "v01"
+    file_name_stub: str = ""  # Must be overridden by subclass
     
     @staticmethod
     def _execute_export(*, select_query: str, file_name_stub: str, version_number: str) -> None:
@@ -127,13 +126,22 @@ OVERWRITE = TRUE;
         """
         pass
         
-    def do_idr_output(self, *, file_name_stub: str) -> None:
+    def do_idr_output(self) -> None:
         """
         Main method that calls getSelectQuery() to get the query string 
         and then passes that query to the static class method to perform the output.
+        
+        Uses the file_name_stub class property which must be overridden by subclass.
         """
         try:
-            print(f"do_idr_output: Starting process for {file_name_stub} (version {self.version_number})")
+            # Validate that file_name_stub has been set by subclass
+            if not self.file_name_stub or not self.file_name_stub.strip():
+                raise ValueError(
+                    f"file_name_stub class property must be set by subclass {self.__class__.__name__}. "
+                    f"Set file_name_stub = 'your_filename_here' in your class definition."
+                )
+            
+            print(f"do_idr_output: Starting process for {self.file_name_stub} (version {self.version_number})")
             
             # Call getSelectQuery() method to get the query string
             select_query = self.getSelectQuery()
@@ -144,14 +152,14 @@ OVERWRITE = TRUE;
             # Pass the query to the static class method to perform the output
             self._execute_export(
                 select_query=select_query, 
-                file_name_stub=file_name_stub,
+                file_name_stub=self.file_name_stub,
                 version_number=self.version_number
             )
             
-            print(f"do_idr_output: Completed process for {file_name_stub}")
+            print(f"do_idr_output: Completed process for {self.file_name_stub}")
             
         except Exception as e:
-            print(f"IDROutputter.do_idr_output Error: Failed to complete output for {file_name_stub}")
+            print(f"IDROutputter.do_idr_output Error: Failed to complete output for {self.file_name_stub if hasattr(self, 'file_name_stub') and self.file_name_stub else '[file_name_stub not set]'}")
             print(f"Error details: {str(e)}")
-            print(f"Check your getSelectQuery() implementation and Snowflake connection")
+            print(f"Check your getSelectQuery() implementation, file_name_stub property, and Snowflake connection")
             raise

@@ -29,6 +29,7 @@ class PecosDbaExporter(IDROutputter):
     
     # Class properties
     version_number: str = "v01"
+    file_name_stub: str = "pecos_dba_history"
     
     def __init__(self):
         # Calculate date values that might be used for filtering in future versions
@@ -65,7 +66,7 @@ class PecosDbaExporter(IDROutputter):
 
 # Execute the export using the IDROutputter framework
 exporter = PecosDbaExporter()
-exporter.do_idr_output(file_name_stub="pecos_dba_history")
+exporter.do_idr_output()
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
