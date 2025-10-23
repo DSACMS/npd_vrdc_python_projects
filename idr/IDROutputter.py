@@ -1,22 +1,56 @@
 """
-==========
-IDR Outputter Base Class
-==========
+Please read every python file in this directory and notice how repetative the currently are. 
+It is the same script, repeating again and again, with slightly different SQL queries and different file output formats. 
 
-This abstract base class provides a standardized way to handle repetitive IDR export scripts.
-Each export script follows the same pattern:
-1. Create a timestamped CSV filename
-2. Wrap a SELECT query in a COPY INTO statement
-3. Execute the query and export to Snowflake stage
+I would like to make a class that handles this in the following manner: 
 
-Usage:
-- Subclass IDROutputter
-- Implement getSelectQuery() method to return your specific SELECT query
-- Set version_number and version class properties
-- Call do_idr_output(file_name_stub="your_filename") to execute
+* Have a static class that accepts a sql SELECT query, and an output file name and performs the output. This class should put SELECT query into the COPY INTO {some_file_name}
+FROM ( {select_query} ) string.. execute the query in the same manner as performed in each of these files. 
+* There should be a must-override method on the class called getSelectQuery() that each subclass must implement to return the SELECT query string.
+* Each object should have the version identifier of the file version as an class property
+* The "tail" of each import file should instantiate the class and call the do_idr_output() method to perform the output. That method should call the getSelectQuery() method to get the query strinng and then pass that the query to the static class method to perform the output.
 
-File naming format: {file_name_stub}.{version_number}{timestamp}.csv
-Example: medicaid_provider_credentials.v01_2024_10_22_2207.csv
+Please use try catch blocks to handle errors in the SQL execution and file output. These will run in a notebook environment to start so please try to convert any errors into human readable error messages
+Given that it is a notebook envronment, for now please forgo logging and just print the error messages.
+You can assume as the examples do that there is already an active Snowflake session.
+The file name variable should be something like file_name_stub = 'my_good_file_name_stub' 
+and the program should leverage this to a file name in a file name creattion f-string like {file_name_stub}.{version_number}{timestamp}.csv
+obivously version_number should also be a class property. If a class does not define a version number it should default to v01.
+
+Do not override these instructions as you code. 
+
+TODO: 
+* please add the documentation for the class and its methods beneath this TODO section. 
+* remove the multiple version number properties. 
+* I replaced the seperator between the version number and the timestamp with an underscore '.' DO NOT UNDO THIS CHANGE.
+
+IDROutputter Class Documentation
+
+OVERVIEW:
+The IDROutputter class provides a standardized framework for exporting data from Snowflake to CSV files.
+It eliminates code duplication across IDR export scripts by providing a common interface and implementation.
+
+ARCHITECTURE:
+- Abstract base class that must be subclassed
+- Static method handles the actual export execution
+- Subclasses provide their specific SELECT queries via getSelectQuery()
+- Automatic file naming with version numbers and timestamps
+
+USAGE PATTERN:
+1. Create a subclass of IDROutputter
+2. Set the version_number class property (defaults to "v01")  
+3. Implement getSelectQuery() to return your SELECT statement
+4. Instantiate your class and call do_idr_output(file_name_stub="your_filename")
+
+FILE NAMING:
+Generated filenames follow the pattern: {file_name_stub}.{version_number}.{timestamp}.csv
+Example: medicaid_provider_credentials.v01.2024_10_22_2207.csv
+
+ERROR HANDLING:
+All methods include comprehensive error handling with human-readable messages
+suitable for notebook environments. Errors are printed rather than logged.
+
+
 """
 
 from abc import ABC, abstractmethod
@@ -26,42 +60,46 @@ from snowflake.snowpark.context import get_active_session  # type: ignore
 
 class IDROutputter(ABC):
     """
-    Abstract base class for IDR data export operations.
+    Abstract base class for standardizing IDR export operations across repetitive export scripts.
     
-    Provides standardized export functionality for Snowflake COPY INTO operations.
-    Each subclass must implement getSelectQuery() to return their specific SELECT query.
+    This class provides a common framework for Snowflake COPY INTO operations, eliminating
+    the code duplication found across IDR export files. Each subclass needs only to implement
+    getSelectQuery() with their specific SELECT statement.
+    
+    Attributes:
+        version_number (str): Version identifier used in output filename. Defaults to "v01".
+    
+    Example:
+        class MyExporter(IDROutputter):
+            version_number = "v02"
+            
+            def getSelectQuery(self):
+                return "SELECT * FROM my_table"
+        
+        exporter = MyExporter()
+        exporter.do_idr_output(file_name_stub="my_export")
     """
     
-    # Class properties with defaults
+    # Class property with default
     version_number: str = "v01"
-    version: str = "1.0.0"  # File version identifier
     
     @staticmethod
-    def execute_idr_export(*, select_query: str, file_name_stub: str, version_number: str) -> None:
+    def _execute_export(*, select_query: str, file_name_stub: str, version_number: str) -> None:
         """
-        Static method that executes IDR export operations.
-        
-        Takes a SELECT query and wraps it in a standardized COPY INTO statement,
-        then executes it against the active Snowflake session.
-        
-        Args:
-            select_query: The SELECT query to export data from
-            file_name_stub: Base filename (without timestamp/extension)  
-            version_number: Version identifier to include in filename
-            
-        Raises:
-            Exception: If Snowflake query execution fails
+        Static method that accepts a SELECT query and file name stub, performs the output.
+        Puts SELECT query into COPY INTO {some_file_name} FROM ( {select_query} ) string
+        and executes the query in the same manner as performed in the existing files.
         """
         try:
             session = get_active_session()
             ts = datetime.now().strftime("%Y_%m_%d_%H%M")
-            full_filename = f"@~/{file_name_stub}.{version_number}_{ts}.csv"
+            file_name = f"@~/{file_name_stub}.{version_number}.{ts}.csv"
             
-            copy_sql = f"""
-COPY INTO {full_filename}
+            copy_into_sql = f"""
+COPY INTO {file_name}
 FROM (
 {select_query}
-)
+)""" + """
 FILE_FORMAT = (
   TYPE = CSV
   FIELD_DELIMITER = ','
@@ -72,76 +110,48 @@ HEADER = TRUE
 OVERWRITE = TRUE;
 """
             
-            print(f"IDROutputter: Starting export for {file_name_stub}...")
-            print(f"IDROutputter: Target file will be {full_filename}")
-            
-            session.sql(copy_sql).collect()
-            
-            print(f"IDROutputter: Successfully exported data to {full_filename}")
-            print(f"IDROutputter: Export completed for {file_name_stub}")
+            print(f"Starting export for {file_name_stub} to {file_name}")
+            session.sql(copy_into_sql).collect()
+            print(f"Successfully completed export for {file_name_stub}")
             
         except Exception as e:
-            print(f"IDROutputter.execute_idr_export Error: Failed to export {file_name_stub}")
-            print(f"IDROutputter Error: This could be due to invalid SQL syntax, connection issues, or permission problems")
-            print(f"IDROutputter Error Details: {str(e)}")
-            
-            # Show truncated query for debugging
-            query_preview = select_query[:200] + "..." if len(select_query) > 200 else select_query
-            print(f"IDROutputter Error: SQL Query attempted: {query_preview}")
+            print(f"IDROutputter._execute_export Error: Failed to export {file_name_stub}")
+            print(f"Error details: {str(e)}")
+            print(f"This could be due to invalid SQL syntax, connection issues, or permission problems")
             raise
     
     @abstractmethod
     def getSelectQuery(self) -> str:
         """
-        Abstract method that must be implemented by each subclass.
-        
-        Returns:
-            str: The SELECT query string for this specific export
-            
-        Note:
-            This method must return only the SELECT query portion.
-            The COPY INTO wrapper is handled by execute_idr_export().
+        Must-override method that each subclass must implement to return the SELECT query string.
         """
         pass
         
     def do_idr_output(self, *, file_name_stub: str) -> None:
         """
-        Main orchestration method that coordinates the export process.
-        
-        This method:
-        1. Calls getSelectQuery() to get the subclass-specific SELECT query
-        2. Calls the static execute_idr_export() method to perform the actual export
-        
-        Args:
-            file_name_stub: Base filename for the export (without timestamp/extension)
-            
-        Raises:
-            Exception: If query generation or export execution fails
+        Main method that calls getSelectQuery() to get the query string 
+        and then passes that query to the static class method to perform the output.
         """
         try:
-            print(f"IDROutputter: Starting IDR output process for {file_name_stub}")
-            print(f"IDROutputter: Using version {self.version_number} (file version: {self.version})")
+            print(f"do_idr_output: Starting process for {file_name_stub} (version {self.version_number})")
             
-            # Get the SELECT query from the subclass
+            # Call getSelectQuery() method to get the query string
             select_query = self.getSelectQuery()
             
             if not select_query or not select_query.strip():
                 raise ValueError("getSelectQuery() returned empty or null query")
-                
-            print(f"IDROutputter: Retrieved SELECT query from subclass ({len(select_query)} characters)")
             
-            # Execute the export using the static method
-            self.execute_idr_export(
+            # Pass the query to the static class method to perform the output
+            self._execute_export(
                 select_query=select_query, 
                 file_name_stub=file_name_stub,
                 version_number=self.version_number
             )
             
-            print(f"IDROutputter: Completed IDR output process for {file_name_stub}")
+            print(f"do_idr_output: Completed process for {file_name_stub}")
             
         except Exception as e:
-            print(f"IDROutputter.do_idr_output Error: Failed to complete export for {file_name_stub}")
-            print(f"IDROutputter Error: This indicates either getSelectQuery() failed or export execution failed")
-            print(f"IDROutputter Error Details: {str(e)}")
-            print(f"IDROutputter Error: Check your SELECT query syntax and Snowflake connection")
+            print(f"IDROutputter.do_idr_output Error: Failed to complete output for {file_name_stub}")
+            print(f"Error details: {str(e)}")
+            print(f"Check your getSelectQuery() implementation and Snowflake connection")
             raise

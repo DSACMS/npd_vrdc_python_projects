@@ -1,6 +1,6 @@
 """
 ==========
-Medicaid Provider Licensing Credential Export
+Medicaid Provider Licensing Credential Export (IDROutputter Implementation)
 ==========
 
 
@@ -14,26 +14,37 @@ This script downloads Medicaid provider credential data, focusing on licenses an
 	•	Limits results to providers with valid state-level Medicare codes.
 	•	Excludes license entries that are clearly not useful — for example, records that only restate the NPI instead of a real license.
 
+This is the NEW implementation using the IDROutputter base class to eliminate code duplication.
 """
 
 # Note: you must have an appropriate role chosen and the IDRC_PRD_COMM_WH warehouse selected
 
 # Import python packages
-import streamlit as st  # type: ignore
 import pandas as pd
-from datetime import datetime
 
-# We can also use Snowpark for our analyses!
-from snowflake.snowpark.context import get_active_session # type: ignore
-session = get_active_session()
+# Import the IDROutputter base class
+from IDROutputter import IDROutputter
 
-ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-medicaid_credentials_file_name = f"@~/medicaid_provider_credentials.{ts}.csv"
-
-medicaid_credentials_sql = f"""
-COPY INTO {medicaid_credentials_file_name}
-FROM (
+class MedicaidProviderCredentialsExporter(IDROutputter):
+    """
+    Exports Medicaid provider credential data using IDROutputter base class.
+    
+    Downloads Medicaid provider credential data focusing on licenses and license numbers.
+    Resolves license type codes and excludes non-useful license entries.
+    """
+    
+    # Class property - version number for filename
+    version_number: str = "v01"
+    
+    def getSelectQuery(self) -> str:
+        """
+        Returns the SELECT query for Medicaid provider credentials export.
+        
+        Retrieves license information with type descriptions, filtering for valid
+        state-level Medicare codes and excluding non-useful license entries.
+        """
+        return """
 		SELECT 
 			PRVDR_STATE_MDCD_ID,
 			PRVDR_LCNS_ISSG_ENT_ID,
@@ -50,19 +61,13 @@ FROM (
 		AND license_list.PRVDR_MDCD_LCNS_TYPE_CD != '2' 
 		AND license_list.PRVDR_MDCD_LCNS_TYPE_CD != '~'
 		AND PRVDR_LCNS_ISSG_ENT_ID != 'NPI'
-)""" + """
-FILE_FORMAT = (
-  TYPE = CSV
-  FIELD_DELIMITER = ','
-  FIELD_OPTIONALLY_ENCLOSED_BY = '"'
-  COMPRESSION = NONE
-)
-HEADER = TRUE
-OVERWRITE = TRUE;
-"""
+        """
 
-session.sql(medicaid_credentials_sql).collect()
+
+# Execute the export using the IDROutputter framework
+exporter = MedicaidProviderCredentialsExporter()
+exporter.do_idr_output(file_name_stub="medicaid_provider_credentials")
 
 # To download use: 
 # snowsql -c cms_idr -q "GET @~/ file://. PATTERN='.*.csv';"
-# Or look in ../idr_data/ for idr_data/download_and_merge_all_snowflake_csv.sh which downloads the data from idr and then re-merges the csv files.
+# Or look in ../misc_scripts/ for misc_scripts/download_and_merge_all_snowflake_csv.sh which downloads the data from idr and then re-merges the csv files.
