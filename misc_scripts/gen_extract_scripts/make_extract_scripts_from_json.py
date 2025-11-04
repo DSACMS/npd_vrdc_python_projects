@@ -99,9 +99,14 @@ def generate_select_query(*, table_info: Dict[str, Any]) -> str:
         elif col.get("data_type"):
             comment_parts.append(col["data_type"])
         
-        # Add column description/comment if available
+        # Add column description/comment if available, sanitized for single-line SQL
         if col.get("comment"):
-            comment_parts.append(col["comment"])
+            # Remove newlines and extra whitespace to ensure single-line comment
+            sanitized_comment = col["comment"].replace('\n', ' ').replace('\r', ' ')
+            # Collapse multiple spaces into single space and strip
+            sanitized_comment = ' '.join(sanitized_comment.split())
+            if sanitized_comment:
+                comment_parts.append(sanitized_comment)
         
         # Combine comment parts
         if comment_parts:
