@@ -67,12 +67,13 @@ def convert_to_snake_case(input_str: str) -> str:
 def generate_select_query(*, table_info: Dict[str, Any]) -> str:
     """
     Generate SELECT query string with all columns in Snowflake order.
+    Includes SQL comments with type and description information.
     
     Args:
         table_info: Table information dictionary from JSON metadata
         
     Returns:
-        Formatted SELECT query string
+        Formatted SELECT query string with informative comments
     """
     database = table_info["database"]
     schema = table_info["schema"] 
@@ -82,13 +83,33 @@ def generate_select_query(*, table_info: Dict[str, Any]) -> str:
     # Sort columns by ordinal_position to maintain Snowflake order
     sorted_columns = sorted(columns, key=lambda x: x["ordinal_position"])
     
-    # Create column list with proper indentation
+    # Create column list with proper indentation and comments
     column_lines = []
     for i, col in enumerate(sorted_columns):
         column_name = col["column_name"]
         # Add comma except for the last column
         comma = "," if i < len(sorted_columns) - 1 else ""
-        column_lines.append(f"                {column_name}{comma}")
+        
+        # Build the comment with type and description
+        comment_parts = []
+        
+        # Add type description (e.g., VARCHAR(255), DECIMAL(15,2))
+        if col.get("type_description"):
+            comment_parts.append(col["type_description"])
+        elif col.get("data_type"):
+            comment_parts.append(col["data_type"])
+        
+        # Add column description/comment if available
+        if col.get("comment"):
+            comment_parts.append(col["comment"])
+        
+        # Combine comment parts
+        if comment_parts:
+            comment = " -- " + ": ".join(comment_parts)
+        else:
+            comment = ""
+        
+        column_lines.append(f"                {column_name}{comma}{comment}")
     
     columns_str = "\n".join(column_lines)
     
