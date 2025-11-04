@@ -4,7 +4,14 @@ Automated system for generating IDROutputter scripts from Snowflake table metada
 
 ## Usage
 
-**Step 1: Discover table metadata** (run in Snowflake notebook):
+**Step 1: Discover table metadata** 
+
+*Option A: CLI usage (in Snowflake environment):*
+```bash
+python make_json_from_table_match.py --pattern '%PROVIDER%' --output provider_metadata.json --database IDRC_PRD
+```
+
+*Option B: Notebook usage:*
 ```python
 # Set your parameters
 search_pattern = '%PROVIDER%'

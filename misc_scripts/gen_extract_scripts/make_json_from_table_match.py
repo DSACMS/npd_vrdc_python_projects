@@ -241,21 +241,84 @@ def run_metadata_discovery(*, search_pattern: str, output_file: str, database_na
         raise
 
 
+def main():
+    """Main function for CLI usage"""
+    parser = argparse.ArgumentParser(
+        description="Discover Snowflake table metadata matching a LIKE pattern",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+    python make_json_from_table_match.py --pattern '%PROVIDER%' --output provider_metadata.json --database IDRC_PRD
+    python make_json_from_table_match.py --pattern '%MEDICAID%' --output medicaid_metadata.json
+    python make_json_from_table_match.py --pattern 'V2_%' --output v2_tables.json --database ANALYTICS_DB
+        """
+    )
+    
+    parser.add_argument(
+        '--pattern', 
+        required=True,
+        help="LIKE pattern for table matching (e.g., '%%PROVIDER%%'). Case-insensitive."
+    )
+    
+    parser.add_argument(
+        '--output',
+        required=True, 
+        help="Output JSON file path"
+    )
+    
+    parser.add_argument(
+        '--database',
+        help="Database name to search in. If not specified, uses current database context."
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        # Run the metadata discovery
+        metadata = run_metadata_discovery(
+            search_pattern=args.pattern, 
+            output_file=args.output,
+            database_name=args.database
+        )
+        
+    except Exception as e:
+        print(f"\nFailed to complete metadata discovery: {str(e)}")
+        exit(1)
+
+
 # Example usage in notebook:
 # 
 # Set your parameters here:
 # search_pattern = '%PROVIDER%'
 # output_file = 'provider_metadata.json'
+# database_name = 'IDRC_PRD'  # Optional
 #
 # Run the discovery:
-# metadata = run_metadata_discovery(search_pattern=search_pattern, output_file=output_file)
+# metadata = run_metadata_discovery(
+#     search_pattern=search_pattern, 
+#     output_file=output_file,
+#     database_name=database_name
+# )
 
 if __name__ == '__main__':
-    # Example parameters - modify these in your notebook
-    search_pattern = '%PROVIDER%'  # Change this to your desired pattern
-    output_file = 'metadata_output.json'  # Change this to your desired output file
-    
-    print("Running with example parameters...")
-    print("Modify search_pattern and output_file variables for your use case.")
-    
-    run_metadata_discovery(search_pattern=search_pattern, output_file=output_file)
+    # Check if CLI arguments were provided
+    import sys
+    if len(sys.argv) > 1:
+        # CLI mode - use argument parser
+        main()
+    else:
+        # Direct execution mode - use example parameters
+        print("Running with example parameters...")
+        print("To use CLI arguments, run with --pattern, --output, and optional --database")
+        print("")
+        
+        # Example parameters - modify these as needed
+        search_pattern = '%PROVIDER%'
+        output_file = 'metadata_output.json'
+        database_name = None  # Will use current database context
+        
+        run_metadata_discovery(
+            search_pattern=search_pattern, 
+            output_file=output_file,
+            database_name=database_name
+        )
