@@ -7,7 +7,7 @@ Auto-generated IDROutputter implementation for IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2
 
 Table Type: VIEW
 Columns: 18
-Generated: 2025-11-04 00:53:50
+Generated: 2025-11-04 01:30:17
 Source Pattern: %PRVDR_ENMRT%
 
 This script provides a complete IDROutputter subclass that exports all columns
