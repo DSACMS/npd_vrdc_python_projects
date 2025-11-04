@@ -8,7 +8,11 @@ Automated system for generating IDROutputter scripts from Snowflake table metada
 
 *Option A: CLI usage (in Snowflake environment):*
 ```bash
+# Basic usage
 python make_json_from_table_match.py --pattern '%PROVIDER%' --output provider_metadata.json --database IDRC_PRD
+
+# With inline printing
+python make_json_from_table_match.py --pattern '%PROVIDER%' --output metadata.json --database IDRC_PRD --print-inline
 ```
 
 *Option B: Notebook usage:*
@@ -18,13 +22,20 @@ search_pattern = '%PROVIDER%'
 output_file = 'provider_metadata.json'
 database_name = 'IDRC_PRD'  # Optional: specify database, or use current database context
 
-# Run the discovery
+# Run the discovery with inline JSON printing (recommended for notebooks)
 from make_json_from_table_match import run_metadata_discovery
 metadata = run_metadata_discovery(
     search_pattern=search_pattern, 
     output_file=output_file,
-    database_name=database_name  # Optional parameter
+    database_name=database_name,
+    print_inline=True  # Shows JSON output directly in notebook
 )
+```
+
+*Option C: Direct execution (default inline printing):*
+Just run the script directly - it will print JSON inline by default:
+```bash
+python make_json_from_table_match.py
 ```
 
 **Step 2: Generate IDR export scripts**:

@@ -34,7 +34,22 @@ Output JSON Structure:
                         "column_name": "PRVDR_NPI_NUM",
                         "data_type": "VARCHAR",
                         "ordinal_position": 1,
-                        "is_nullable": "YES"
+                        "is_nullable": "YES",
+                        "column_default": null,
+                        "comment": "National Provider Identifier",
+                        "character_maximum_length": 10,
+                        "type_description": "VARCHAR(10)"
+                    },
+                    {
+                        "column_name": "PRVDR_BALANCE",
+                        "data_type": "DECIMAL", 
+                        "ordinal_position": 2,
+                        "is_nullable": "YES",
+                        "column_default": "0.00",
+                        "comment": "Provider account balance",
+                        "numeric_precision": 15,
+                        "numeric_scale": 2,
+                        "type_description": "DECIMAL(15,2)"
                     }
                 ]
             }
@@ -115,12 +130,18 @@ def discover_tables_and_columns(*, search_pattern: str, database_name: str | Non
             print(f"Processing: {database_name}.{schema_name}.{table_name}")
             
             # Query columns for this specific table, ordered by position in Snowflake
+            # Include additional metadata like comments, character limits, numeric precision, etc.
             columns_query = f"""
                 SELECT 
                     column_name,
                     data_type,
                     ordinal_position,
-                    is_nullable
+                    is_nullable,
+                    column_default,
+                    comment,
+                    character_maximum_length,
+                    numeric_precision,
+                    numeric_scale
                 FROM {database_name}.information_schema.columns
                 WHERE table_catalog = '{database_name}'
                     AND table_schema = '{schema_name}'
@@ -132,12 +153,37 @@ def discover_tables_and_columns(*, search_pattern: str, database_name: str | Non
             
             columns_data = []
             for col_row in columns_result:
-                columns_data.append({
+                # Build comprehensive column metadata
+                column_info = {
                     "column_name": col_row[0],
                     "data_type": col_row[1], 
                     "ordinal_position": col_row[2],
-                    "is_nullable": col_row[3]
-                })
+                    "is_nullable": col_row[3],
+                    "column_default": col_row[4] if col_row[4] else None,
+                    "comment": col_row[5] if col_row[5] else None,
+                }
+                
+                # Add type-specific details
+                if col_row[6]:  # character_maximum_length
+                    column_info["character_maximum_length"] = col_row[6]
+                if col_row[7]:  # numeric_precision
+                    column_info["numeric_precision"] = col_row[7]
+                if col_row[8]:  # numeric_scale
+                    column_info["numeric_scale"] = col_row[8]
+                
+                # Create a more descriptive type description
+                data_type = col_row[1]
+                type_description = data_type
+                if col_row[6]:  # VARCHAR, CHAR, etc.
+                    type_description = f"{data_type}({col_row[6]})"
+                elif col_row[7]:  # NUMERIC, DECIMAL, etc.
+                    if col_row[8] and col_row[8] > 0:
+                        type_description = f"{data_type}({col_row[7]},{col_row[8]})"
+                    else:
+                        type_description = f"{data_type}({col_row[7]})"
+                
+                column_info["type_description"] = type_description
+                columns_data.append(column_info)
             
             table_info = {
                 "database": database_name,
@@ -169,18 +215,26 @@ def discover_tables_and_columns(*, search_pattern: str, database_name: str | Non
         raise
 
 
-def save_metadata_json(*, metadata: Dict[str, Any], output_file: str) -> None:
+def save_metadata_json(*, metadata: Dict[str, Any], output_file: str, print_inline: bool = False) -> None:
     """
-    Saves metadata dictionary to JSON file with pretty formatting.
+    Saves metadata dictionary to JSON file with pretty formatting and optionally prints inline.
     
     Args:
         metadata: The metadata dictionary to save
         output_file: Path to output JSON file
+        print_inline: Whether to print the JSON content inline to console
     """
     try:
         with open(output_file, 'w') as f:
             json.dump(metadata, f, indent=2, sort_keys=False)
         print(f"Metadata saved to: {output_file}")
+        
+        # Print JSON inline if requested
+        if print_inline:
+            print(f"\nJSON OUTPUT:")
+            print(f"============")
+            print(json.dumps(metadata, indent=2, sort_keys=False))
+            print(f"============")
         
         # Print summary
         table_count = metadata["metadata"]["total_tables_found"]
@@ -204,7 +258,7 @@ def save_metadata_json(*, metadata: Dict[str, Any], output_file: str) -> None:
         raise
 
 
-def run_metadata_discovery(*, search_pattern: str, output_file: str, database_name: str | None = None) -> Dict[str, Any]:
+def run_metadata_discovery(*, search_pattern: str, output_file: str, database_name: str | None = None, print_inline: bool = False) -> Dict[str, Any]:
     """
     Main function for notebook usage.
     
@@ -212,6 +266,7 @@ def run_metadata_discovery(*, search_pattern: str, output_file: str, database_na
         search_pattern: LIKE pattern for table matching (e.g., '%PROVIDER%')
         output_file: Path to output JSON file
         database_name: Optional database name to search in. If None, uses current database context.
+        print_inline: Whether to print the JSON content inline to console
         
     Returns:
         Dictionary containing metadata and table information
@@ -224,14 +279,15 @@ def run_metadata_discovery(*, search_pattern: str, output_file: str, database_na
         print(f"Database: {database_name}")
     else:
         print("Database: [Using current database context]")
+    print(f"Print Inline: {'Yes' if print_inline else 'No'}")
     print("")
     
     try:
         # Discover tables and columns
         metadata = discover_tables_and_columns(search_pattern=search_pattern, database_name=database_name)
         
-        # Save to JSON file
-        save_metadata_json(metadata=metadata, output_file=output_file)
+        # Save to JSON file and optionally print inline
+        save_metadata_json(metadata=metadata, output_file=output_file, print_inline=print_inline)
         
         print(f"\nSuccess! Metadata discovery completed.")
         return metadata
@@ -271,6 +327,12 @@ Examples:
         help="Database name to search in. If not specified, uses current database context."
     )
     
+    parser.add_argument(
+        '--print-inline',
+        action='store_true',
+        help="Print JSON output inline to console in addition to saving to file."
+    )
+    
     args = parser.parse_args()
     
     try:
@@ -278,7 +340,8 @@ Examples:
         metadata = run_metadata_discovery(
             search_pattern=args.pattern, 
             output_file=args.output,
-            database_name=args.database
+            database_name=args.database,
+            print_inline=args.print_inline
         )
         
     except Exception as e:
@@ -316,9 +379,11 @@ if __name__ == '__main__':
         search_pattern = '%PROVIDER%'
         output_file = 'metadata_output.json'
         database_name = None  # Will use current database context
+        print_inline = True  # Print JSON inline by default for notebook use
         
         run_metadata_discovery(
             search_pattern=search_pattern, 
             output_file=output_file,
-            database_name=database_name
+            database_name=database_name,
+            print_inline=print_inline
         )
