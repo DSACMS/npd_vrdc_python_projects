@@ -90,7 +90,9 @@ class MergeStatusChecker:
         unmerged_groups = {}
         
         for root_name, file_list in file_groups.items():
-            merged_file_path = os.path.join(output_dir, f"{root_name}.csv")
+            # Ensure we don't create double .csv extensions
+            output_filename = f"{root_name}.csv" if not root_name.endswith('.csv') else root_name
+            merged_file_path = os.path.join(output_dir, output_filename)
             
             if not os.path.exists(merged_file_path):
                 unmerged_groups[root_name] = file_list
@@ -239,7 +241,10 @@ class SelectiveMergeProcessor:
             # Use existing merge_group function
             merge_group(group_name, file_list, outdir=output_dir)
             
-            output_file = os.path.join(output_dir, f"{group_name}.csv")
+            # Ensure we don't create double .csv extensions
+            output_filename = f"{group_name}.csv" if not group_name.endswith('.csv') else group_name
+            output_file = os.path.join(output_dir, output_filename)
+            
             if os.path.exists(output_file):
                 print(f" ✓ Successfully created: {output_file}")
                 return True

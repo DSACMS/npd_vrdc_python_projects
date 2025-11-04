@@ -54,6 +54,7 @@ def group_files(files):
     """
     Group files by their root before the Snowflake part suffix (_0_0_0, etc.).
     E.g. 'foo_0_0_0.csv' and 'foo_0_0_1.csv' -> root 'foo'
+    Also handles 'foo.csv_0_0_0.csv' -> root 'foo'
     """
     groups = defaultdict(list)
     for f in files:
@@ -66,6 +67,11 @@ def group_files(files):
 
         # remove the trailing Snowflake suffix if present
         root = re.sub(r'(_\d+_\d+_\d+)$', '', base)
+        
+        # Handle case where root already ends with .csv (from files like filename.csv_0_0_0.csv)
+        if root.endswith('.csv'):
+            root = root[:-4]
+        
         groups[root].append(f)
     return groups
 
