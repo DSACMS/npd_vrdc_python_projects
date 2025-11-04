@@ -17,7 +17,7 @@ session = get_active_session()
 
 ts = datetime.now().strftime("%Y_%m_%d_%H%M")
 
-pecos_recent_address_file_name = f"@~/pecos_recent_practice_address.{ts}.csv"
+pecos_recent_address_file_name = f"@~/pecos_current_practice_address_w_date.{ts}.csv"
 
 pecos_recent_address_sql = f"""
 COPY INTO {pecos_recent_address_file_name}
@@ -36,9 +36,13 @@ FROM (
         FAX_NUM,
         TO_DATE(IDR_UPDT_TS) AS IDR_UPDT_TS_DATE,
         TO_DATE(IDR_TRANS_OBSLT_TS) AS IDR_TRANS_OBSLT_TS_DATE,
-        TO_DATE(IDR_TRANS_EFCTV_TS) AS IDR_TRANS_EFCTV_TS_DATE
+        TO_DATE(IDR_TRANS_EFCTV_TS) AS IDR_TRANS_EFCTV_TS_DATE,
+        CASE WHEN 
+          YEAR(IDR_TRANS_OBSLT_TS) = 9999 THEN 1 
+          ELSE 0 
+          END AS is_current
     FROM IDRC_PRD.CMS_VDM_VIEW_MDCR_PRD.V2_PRVDR_ENMRT_ADR_HSTRY
-    WHERE YEAR(IDR_TRANS_OBSLT_TS) = 9999 AND ADR_TYPE_DESC = 'PRACTICE'
+    WHERE  ADR_TYPE_DESC = 'PRACTICE'
 )""" + """
 FILE_FORMAT = (
   TYPE = CSV
