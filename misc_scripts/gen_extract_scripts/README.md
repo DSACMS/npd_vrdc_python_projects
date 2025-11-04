@@ -9,10 +9,15 @@ Automated system for generating IDROutputter scripts from Snowflake table metada
 # Set your parameters
 search_pattern = '%PROVIDER%'
 output_file = 'provider_metadata.json'
+database_name = 'IDRC_PRD'  # Optional: specify database, or use current database context
 
 # Run the discovery
 from make_json_from_table_match import run_metadata_discovery
-metadata = run_metadata_discovery(search_pattern=search_pattern, output_file=output_file)
+metadata = run_metadata_discovery(
+    search_pattern=search_pattern, 
+    output_file=output_file,
+    database_name=database_name  # Optional parameter
+)
 ```
 
 **Step 2: Generate IDR export scripts**:

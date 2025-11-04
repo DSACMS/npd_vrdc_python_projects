@@ -47,12 +47,13 @@ import argparse
 from datetime import datetime
 from typing import Dict, List, Any
 
-def discover_tables_and_columns(*, search_pattern: str) -> Dict[str, Any]:
+def discover_tables_and_columns(*, search_pattern: str, database_name: str | None = None) -> Dict[str, Any]:
     """
     Discovers tables/views matching the search pattern and their column metadata.
     
     Args:
         search_pattern: LIKE pattern for table matching (e.g., '%PROVIDER%')
+        database_name: Optional database name to search in. If None, uses current database context.
         
     Returns:
         Dictionary containing metadata and table information
@@ -61,20 +62,33 @@ def discover_tables_and_columns(*, search_pattern: str) -> Dict[str, Any]:
         from snowflake.snowpark.context import get_active_session  # type: ignore
         session = get_active_session()
         
+        # Get current database if none specified
+        if database_name is None:
+            current_db_result = session.sql("SELECT CURRENT_DATABASE()").collect()
+            if current_db_result and current_db_result[0][0]:
+                database_name = current_db_result[0][0]
+                print(f"Using current database: {database_name}")
+            else:
+                raise ValueError("No database specified and no current database is set. "
+                               "Please specify database_name parameter or use USE DATABASE first.")
+        else:
+            print(f"Searching in specified database: {database_name}")
+        
         print(f"Searching for tables matching pattern: {search_pattern}")
         
-        # Query to find matching tables/views with case-insensitive LIKE
+        # Query to find matching tables/views with case-insensitive LIKE in specified database
         tables_query = f"""
             SELECT DISTINCT
                 table_catalog AS database_name,
                 table_schema AS schema_name, 
                 table_name,
                 table_type
-            FROM information_schema.tables
+            FROM {database_name}.information_schema.tables
             WHERE UPPER(table_name) LIKE UPPER('{search_pattern}')
             ORDER BY database_name, schema_name, table_name
         """
         
+        print(f"Executing query: {tables_query}")
         tables_result = session.sql(tables_query).collect()
         
         if not tables_result:
@@ -107,7 +121,7 @@ def discover_tables_and_columns(*, search_pattern: str) -> Dict[str, Any]:
                     data_type,
                     ordinal_position,
                     is_nullable
-                FROM information_schema.columns
+                FROM {database_name}.information_schema.columns
                 WHERE table_catalog = '{database_name}'
                     AND table_schema = '{schema_name}'
                     AND table_name = '{table_name}'
@@ -190,13 +204,14 @@ def save_metadata_json(*, metadata: Dict[str, Any], output_file: str) -> None:
         raise
 
 
-def run_metadata_discovery(*, search_pattern: str, output_file: str) -> Dict[str, Any]:
+def run_metadata_discovery(*, search_pattern: str, output_file: str, database_name: str | None = None) -> Dict[str, Any]:
     """
     Main function for notebook usage.
     
     Args:
         search_pattern: LIKE pattern for table matching (e.g., '%PROVIDER%')
         output_file: Path to output JSON file
+        database_name: Optional database name to search in. If None, uses current database context.
         
     Returns:
         Dictionary containing metadata and table information
@@ -205,11 +220,15 @@ def run_metadata_discovery(*, search_pattern: str, output_file: str) -> Dict[str
     print("===========================")
     print(f"Search Pattern: {search_pattern}")
     print(f"Output File: {output_file}")
+    if database_name:
+        print(f"Database: {database_name}")
+    else:
+        print("Database: [Using current database context]")
     print("")
     
     try:
         # Discover tables and columns
-        metadata = discover_tables_and_columns(search_pattern=search_pattern)
+        metadata = discover_tables_and_columns(search_pattern=search_pattern, database_name=database_name)
         
         # Save to JSON file
         save_metadata_json(metadata=metadata, output_file=output_file)
