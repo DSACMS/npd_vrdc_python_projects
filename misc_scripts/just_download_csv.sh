@@ -5,9 +5,6 @@
 #This is where snowsql likes to install itself
 alias snowsql="/Applications/SnowSQL.app/Contents/MacOS/snowsql"
 
-# Delete the previous run
-#rm ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/*.csv
-
 # move to the download directory to being the download
 pushd ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/
 
@@ -17,8 +14,4 @@ pushd ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/
 # go back the main directory
 popd
 
-# merge the new csv file here. 
-python3 ./snowflake_csv_merge.py ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/ --output-dir ~/cms_data_downloads_possible_pii/idr_data/
-
-# Beep signal end of script
- echo -e '\a'
+echo -e '\a'
