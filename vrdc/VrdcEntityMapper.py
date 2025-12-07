@@ -1,5 +1,5 @@
 """
-VRDC Entity Column Mapper
+VrdcEntityMapper.py -- VRDC Entity Column Mapper
 
 This module provides a class for mapping entity identifiers across different
 medical claims benefit settings. It handles the complex field mappings between
@@ -127,7 +127,7 @@ class VRDCEntityMapper:
                 {'table': 'CLAIM', 'field': 'OT_PHYSN_NPI', 'alias': 'OT_PHYSN_NPI'},
                 {'table': 'CLAIM', 'field': 'RNDRNG_PHYSN_NPI', 'alias': 'claim_RNDRNG_PHYSN_NPI'},
                 {'table': 'CLINE', 'field': 'RNDRNG_PHYSN_NPI', 'alias': 'cline_RNDRNG_PHYSN_NPI'},
-                {'table': 'CLINE', 'field': 'ORDRG_PHYSN_NPI', 'alias': 'ORDRG_PHYSN_NPI'}
+                {'table': 'CLINE', 'field': 'ORDRNG_PHYSN_NPI', 'alias': 'ORDRNG_PHYSN_NPI'}
             ]
         }
         
@@ -136,7 +136,7 @@ class VRDCEntityMapper:
             'tax_id': institutional_base['tax_id'][:],
             'ccn': institutional_base['ccn'][:],
             'organizational_npi': [field for field in institutional_base['organizational_npi'] if field['field'] != 'SRVC_LOC_NPI_NUM'],  # not found in Inpatient
-            'personal_npi': [field for field in institutional_base['personal_npi'] if field['field'] != 'ORDRG_PHYSN_NPI']  # not found in Inpatient
+            'personal_npi': [field for field in institutional_base['personal_npi'] if field['field'] != 'ORDRNG_PHYSN_NPI']  # not found in Inpatient
         }
         
         # outpatient - full institutional format
@@ -151,8 +151,8 @@ class VRDCEntityMapper:
         mappings['snf'] = {
             'tax_id': [],  # OWNG_PRVDR_TIN_NUM not found in SNF
             'ccn': institutional_base['ccn'][:],
-            'organizational_npi': institutional_base['organizational_npi'][:],
-            'personal_npi': [field for field in institutional_base['personal_npi'] if field['field'] != 'ORDRG_PHYSN_NPI']  # not found in SNF
+            'organizational_npi': [field for field in institutional_base['organizational_npi'] if field['field'] != 'SRVC_LOC_NPI_NUM'],
+            'personal_npi': [field for field in institutional_base['personal_npi'] if field['field'] != 'ORDRNG_PHYSN_NPI' ]  # not found in SNF
         }
         
         # hospice - missing OWNG_PRVDR_TIN_NUM

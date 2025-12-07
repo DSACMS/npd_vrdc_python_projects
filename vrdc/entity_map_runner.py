@@ -1,5 +1,5 @@
 """
-VRDC Entity Map Creation Runner
+entity_map_runner.py - VRDC Entity Map Creation Runner
 
 This notebook runner uses the VRDCEntityMapBuilder class to create entity maps
 from VRDC claims data. Configure the variables below and run in Databricks.
@@ -21,7 +21,7 @@ output_database = 'dua_000000_ftr460'  # Replace with your database
 
 # Entity Map Configuration
 entity_map_view_name = 'vrdc_entity_map_view'
-entity_map_table_name = 'vrdc_entity_map'
+entity_map_table_base = 'vrdc_entity_map'
 entity_log_table_name = 'vrdc_entity_map_log'
 
 # Privacy threshold - minimum beneficiaries to include
@@ -29,9 +29,12 @@ cms_privacy_threshold = 10
 
 # Time Range Configuration (modify these)
 analysis_start_year = 2025
-analysis_start_month = 1
+analysis_start_month = 9
 analysis_end_year = 2025
-analysis_end_month = 8
+analysis_end_month = 10
+
+# Have the output table record the date range in its name
+entity_map_table_name = f"{entity_map_table_base}_{analysis_start_year}{analysis_start_month:02d}_{analysis_end_year}{analysis_end_month:02d}"
 
 # Settings to include (leave empty list for all settings)
 include_settings = []  # All settings
