@@ -6,7 +6,7 @@
 alias snowsql="/Applications/SnowSQL.app/Contents/MacOS/snowsql"
 
 # Delete the previous run
-#rm ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/*.csv
+rm ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/*.csv
 
 # move to the download directory to being the download
 pushd ~/cms_data_downloads_possible_pii/idr_data/unmerged_csv_files/
